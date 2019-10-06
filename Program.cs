@@ -13,7 +13,6 @@ namespace AutoTPs
     {
         static void Main(string[] args)
         {
-            List<Question> questions = new List<Question>();
             IWebDriver driver = new ChromeDriver(".");
 
             //login
@@ -29,49 +28,63 @@ namespace AutoTPs
             //SeleniumMethods.Click(driver, "[href*='/courses/5379/modules/items/100155']", "HRef");
             driver.Navigate().GoToUrl("https://siglo21.instructure.com/courses/5379/quizzes/19372?module_item_id=100155");
 
-            //take it
-            SeleniumMethods.Click(driver, "[href*='/courses/5379/quizzes/19372/take?user_id=90628']", "HRef");
+            List<Question> questions = new List<Question>();
+            double mark = 0;
+            double expectedMark = 0;
 
-            //scrap it
-            HtmlDocument doc = new HtmlDocument();
-            doc.LoadHtml(driver.PageSource);
-
-            //load questions
-            LoadQuestions(doc, questions);
-
-            Question questionTrueFalse = questions.Where(
-                q => q.Resolved == false
-                && q.Type == "multiple_choice_question"
-                && q.Answers.Count == 2)
-                .FirstOrDefault();
-
-            string answerSelected = questionTrueFalse.Answers.FirstOrDefault();
-
-            SeleniumMethods.Click(driver, answerSelected, "Id");
-
-            SeleniumMethods.Click(driver, "submit_quiz_button", "Id");
-
-            driver.SwitchTo().Alert().Accept();
-
-            doc.LoadHtml(driver.PageSource);
-
-            double nota = -1;
-
-            foreach (var Nodo in doc.DocumentNode.CssSelect(".score_value"))
+            while (mark < 100)
             {
-                nota = Convert.ToDouble(Nodo.InnerHtml);
-            }
-            if (nota == 5)
-            {
-                questionTrueFalse.CorrectAnswers.Add(answerSelected);
-                questionTrueFalse.WrongAnswers.Add(questionTrueFalse.Answers.Where(a => a != answerSelected).FirstOrDefault());
-                questionTrueFalse.Resolved = true;
-            }
-            else
-            {
-                questionTrueFalse.CorrectAnswers.Add(questionTrueFalse.Answers.Where(a => a != answerSelected).FirstOrDefault());
-                questionTrueFalse.WrongAnswers.Add(answerSelected);
-                questionTrueFalse.Resolved = true;
+                //take it
+                SeleniumMethods.Click(driver, "[href*='/courses/5379/quizzes/19372/take?user_id=90628']", "HRef");
+
+                //scrap it
+                HtmlDocument doc = new HtmlDocument();
+                doc.LoadHtml(driver.PageSource);
+
+                //load questions
+                LoadQuestions(doc, questions);
+
+                //complete with resolved questions
+                foreach(Question q in questions)
+                {
+                    if(q.Resolved == true)
+                    {
+                        foreach (string a in q.Answers) SeleniumMethods.Click(driver, a, "Id");
+                        expectedMark += 5;
+                    }
+                }
+
+                //select an unresolved question
+                Question unresolvedQ = questions.Where(q => q.Resolved == false).FirstOrDefault();
+
+                //select an answer
+                string answerSelected = unresolvedQ.Answers.FirstOrDefault();
+
+                SeleniumMethods.Click(driver, answerSelected, "Id");
+
+
+                SeleniumMethods.Click(driver, "submit_quiz_button", "Id");
+
+                driver.SwitchTo().Alert().Accept();
+
+                doc.LoadHtml(driver.PageSource);
+
+                foreach (var Nodo in doc.DocumentNode.CssSelect(".score_value"))
+                {
+                    mark = Convert.ToDouble(Nodo.InnerHtml);
+                }
+                if (mark == 5)
+                {
+                    unresolvedQ.CorrectAnswers.Add(answerSelected);
+                    unresolvedQ.WrongAnswers.Add(unresolvedQ.Answers.Where(a => a != answerSelected).FirstOrDefault());
+                    unresolvedQ.Resolved = true;
+                }
+                else
+                {
+                    unresolvedQ.CorrectAnswers.Add(unresolvedQ.Answers.Where(a => a != answerSelected).FirstOrDefault());
+                    unresolvedQ.WrongAnswers.Add(answerSelected);
+                    unresolvedQ.Resolved = true;
+                }
             }
 
             driver.Close();
@@ -80,15 +93,12 @@ namespace AutoTPs
         private static void LoadQuestions(HtmlDocument doc, List<Question> questions)
         {
             string idQuestionValue = string.Empty;
-
             foreach (var Nodo in doc.DocumentNode.SelectNodes("//input[@id]"))
             {
                 HtmlAttributeCollection atts = Nodo.Attributes;
                 string answerId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
-
                 Regex regex = new Regex(@"(?<=question_)(.+?)(?=_)");
                 idQuestionValue = regex.Match(answerId).Value;
-
                 if (!questions.Any(q => q.Id == idQuestionValue))
                 {
                     string answerType = atts.Where(a => a.Name.ToLower() == "type").FirstOrDefault().Value;
@@ -98,8 +108,7 @@ namespace AutoTPs
                     Question question = new Question()
                     {
                         Id = idQuestionValue,
-                        Type = type,
-                        Resolved = false,
+                        Type = type
                     };
                     question.Answers.Add(answerId);
                     questions.Add(question);
@@ -107,72 +116,13 @@ namespace AutoTPs
                 else
                 {
                     Question question = questions.Where(q => q.Id == idQuestionValue).FirstOrDefault();
-                    question.Answers.Add(answerId);
+                    if (!question.FullyLoaded) question.Answers.Add(answerId);
                 }
             }
-        }
-
-        /*private static void LoadQuestions(IWebDriver driver, HtmlDocument doc, List<Question> questions)
-        {
-            string idQuestionValue = string.Empty;
-            int idQuestionValueTimes = 0;
-            string idAnswerSelected = string.Empty;
-
-            foreach (var Nodo in doc.DocumentNode.SelectNodes("//div[contains(@class, 'display_question')]").Descendants())
+            foreach(Question q in questions)
             {
-                Question question = new Question() { Resolved = false};
-                HtmlAttributeCollection atts = Nodo.Attributes;
-                foreach (var att in atts)
-                {
-                    if (att.Name.ToLower() == "id")
-                    {
-                        if (att.Value.Contains("answer"))
-                        {
-                            Regex regex = new Regex(@"(?<=question_)(.+?)(?=_)");
-                            Match idQuestion = regex.Match(att.Value);
-                            if (idQuestionValue != idQuestion.Value)
-                            {
-                                if (idQuestionValueTimes == 2)
-                                {
-                                    if (questions.Any(q => q.Id == idQuestion.Value))
-                                    {
-                                        var correctAnswers = questions.Where(q => q.Id == idQuestion.Value).FirstOrDefault().CorrectAnswers;
-                                        foreach (string ans in correctAnswers) SeleniumMethods.Click(driver, ans, "Id");
-                                    }
-                                    else
-                                    {
-                                        idAnswerSelected = att.Value;
-                                        SeleniumMethods.Click(driver, att.Value, "Id");
-                                        return;
-                                    }
-                                }
-                                idQuestionValue = idQuestion.Value;
-                                idQuestionValueTimes = 1;
-                            }
-                            else idQuestionValueTimes++;
-                            question.Answers.Add(att.Value);
-                        }
-                    }
-                }
-                question.Id = idQuestionValue;
-            }
-        }*/
-
-        private static void CleanAllAnswers(IWebDriver driver, HtmlDocument doc)
-        {
-            foreach (var Nodo in doc.DocumentNode.SelectNodes("//div[contains(@class, 'display_question')]").Descendants())
-            {
-                HtmlAttributeCollection atts = Nodo.Attributes;
-                foreach (var att in atts)
-                {
-                    if (att.Name.ToLower() == "id")
-                    {
-                        if (att.Value.Contains("answer"))
-                        {
-                            ((IJavaScriptExecutor)driver).ExecuteScript($"document.getElementById('{att.Value}').checked = false");
-                        }
-                    }
-                }
+                q.FullyLoaded = true;
+                if (q.Answers.Count == 2) q.Type = "true_false_question";
             }
         }
     }
