@@ -32,15 +32,54 @@ namespace AutoTPs
             //take it
             SeleniumMethods.Click(driver, "[href*='/courses/5379/quizzes/19372/take?user_id=90628']", "HRef");
 
+            //scrap it
             HtmlDocument doc = new HtmlDocument();
             doc.LoadHtml(driver.PageSource);
 
-            SolveTrueFalse(doc, driver, questions);
+            //load questions
+            LoadQuestions(doc, questions);
+
+
 
             driver.Close();
         }
 
-        private static void SolveTrueFalse(HtmlDocument doc, IWebDriver driver, List<Question> questions)
+        private static void LoadQuestions(HtmlDocument doc, List<Question> questions)
+        {
+            string idQuestionValue = string.Empty;
+
+            foreach (var Nodo in doc.DocumentNode.SelectNodes("//input[@id]"))
+            {
+                HtmlAttributeCollection atts = Nodo.Attributes;
+                string answerId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
+
+                Regex regex = new Regex(@"(?<=question_)(.+?)(?=_)");
+                idQuestionValue = regex.Match(answerId).Value;
+
+                if (!questions.Any(q => q.Id == idQuestionValue))
+                {
+                    string answerType = atts.Where(a => a.Name.ToLower() == "type").FirstOrDefault().Value;
+                    string type;
+                    if (answerType == "checkbox") type = "multiple_answers_question";
+                    else type = "multiple_choice_question";
+                    Question question = new Question()
+                    {
+                        Id = idQuestionValue,
+                        Type = type,
+                        Resolved = false,
+                    };
+                    question.Answers.Add(answerId);
+                    questions.Add(question);
+                }
+                else
+                {
+                    Question question = questions.Where(q => q.Id == idQuestionValue).FirstOrDefault();
+                    question.Answers.Add(answerId);
+                }
+            }
+        }
+
+        /*private static void LoadQuestions(IWebDriver driver, HtmlDocument doc, List<Question> questions)
         {
             string idQuestionValue = string.Empty;
             int idQuestionValueTimes = 0;
@@ -48,7 +87,7 @@ namespace AutoTPs
 
             foreach (var Nodo in doc.DocumentNode.SelectNodes("//div[contains(@class, 'display_question')]").Descendants())
             {
-                Question question = new Question() { Resolved = false, Answers = new List<string>() };
+                Question question = new Question() { Resolved = false};
                 HtmlAttributeCollection atts = Nodo.Attributes;
                 foreach (var att in atts)
                 {
@@ -83,6 +122,24 @@ namespace AutoTPs
                     }
                 }
                 question.Id = idQuestionValue;
+            }
+        }*/
+
+        private static void CleanAllAnswers(IWebDriver driver, HtmlDocument doc)
+        {
+            foreach (var Nodo in doc.DocumentNode.SelectNodes("//div[contains(@class, 'display_question')]").Descendants())
+            {
+                HtmlAttributeCollection atts = Nodo.Attributes;
+                foreach (var att in atts)
+                {
+                    if (att.Name.ToLower() == "id")
+                    {
+                        if (att.Value.Contains("answer"))
+                        {
+                            ((IJavaScriptExecutor)driver).ExecuteScript($"document.getElementById('{att.Value}').checked = false");
+                        }
+                    }
+                }
             }
         }
     }
