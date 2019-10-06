@@ -8,6 +8,8 @@ namespace AutoTPs
     {
         public Question()
         {
+            FullyLoaded = false;
+            Resolved = false;
             Answers = new List<string>();
             WrongAnswers = new List<string>();
             CorrectAnswers = new List<string>();
@@ -16,6 +18,8 @@ namespace AutoTPs
         public string Id { get; set; }
 
         public string Type { get; set; }
+
+        public bool FullyLoaded { get; set; }
 
         public bool Resolved { get; set; }
         
