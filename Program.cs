@@ -28,7 +28,7 @@ namespace AutoTPs
             //go to TP1
             //SeleniumMethods.Click(driver, "[href*='/courses/5379/modules/items/100155']", "HRef");
             driver.Navigate().GoToUrl("https://siglo21.instructure.com/courses/5379/quizzes/19372?module_item_id=100155");
-        
+
             //take it
             SeleniumMethods.Click(driver, "[href*='/courses/5379/quizzes/19372/take?user_id=90628']", "HRef");
 
@@ -39,7 +39,40 @@ namespace AutoTPs
             //load questions
             LoadQuestions(doc, questions);
 
+            Question questionTrueFalse = questions.Where(
+                q => q.Resolved == false
+                && q.Type == "multiple_choice_question"
+                && q.Answers.Count == 2)
+                .FirstOrDefault();
 
+            string answerSelected = questionTrueFalse.Answers.FirstOrDefault();
+
+            SeleniumMethods.Click(driver, answerSelected, "Id");
+
+            SeleniumMethods.Click(driver, "submit_quiz_button", "Id");
+
+            driver.SwitchTo().Alert().Accept();
+
+            doc.LoadHtml(driver.PageSource);
+
+            double nota = -1;
+
+            foreach (var Nodo in doc.DocumentNode.CssSelect(".score_value"))
+            {
+                nota = Convert.ToDouble(Nodo.InnerHtml);
+            }
+            if (nota == 5)
+            {
+                questionTrueFalse.CorrectAnswers.Add(answerSelected);
+                questionTrueFalse.WrongAnswers.Add(questionTrueFalse.Answers.Where(a => a != answerSelected).FirstOrDefault());
+                questionTrueFalse.Resolved = true;
+            }
+            else
+            {
+                questionTrueFalse.CorrectAnswers.Add(questionTrueFalse.Answers.Where(a => a != answerSelected).FirstOrDefault());
+                questionTrueFalse.WrongAnswers.Add(answerSelected);
+                questionTrueFalse.Resolved = true;
+            }
 
             driver.Close();
         }
