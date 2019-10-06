@@ -13,6 +13,7 @@ namespace AutoTPs
     {
         static void Main(string[] args)
         {
+            List<Question> questions = new List<Question>();
             IWebDriver driver = new ChromeDriver(".");
 
             //login
@@ -31,14 +32,23 @@ namespace AutoTPs
             //take it
             SeleniumMethods.Click(driver, "[href*='/courses/5379/quizzes/19372/take?user_id=90628']", "HRef");
 
-            List<Question> questions = new List<Question>();
             HtmlDocument doc = new HtmlDocument();
             doc.LoadHtml(driver.PageSource);
-            string idAnswerValue = string.Empty;
-            int idAnswerValueTimes = 0;
+
+            SolveTrueFalse(doc, driver, questions);
+
+            driver.Close();
+        }
+
+        private static void SolveTrueFalse(HtmlDocument doc, IWebDriver driver, List<Question> questions)
+        {
+            string idQuestionValue = string.Empty;
+            int idQuestionValueTimes = 0;
+            string idAnswerSelected = string.Empty;
+
             foreach (var Nodo in doc.DocumentNode.SelectNodes("//div[contains(@class, 'display_question')]").Descendants())
             {
-                Question question = new Question();
+                Question question = new Question() { Resolved = false, Answers = new List<string>() };
                 HtmlAttributeCollection atts = Nodo.Attributes;
                 foreach (var att in atts)
                 {
@@ -47,24 +57,33 @@ namespace AutoTPs
                         if (att.Value.Contains("answer"))
                         {
                             Regex regex = new Regex(@"(?<=question_)(.+?)(?=_)");
-                            Match idAnswer = regex.Match(att.Value);
-
-                            if (idAnswerValue != idAnswer.Value)
+                            Match idQuestion = regex.Match(att.Value);
+                            if (idQuestionValue != idQuestion.Value)
                             {
-                                if (idAnswerValueTimes > 1 ) Console.WriteLine($"{idAnswerValue} aparece {idAnswerValueTimes} veces");
-                                if (idAnswerValueTimes == 2)
+                                if (idQuestionValueTimes == 2)
                                 {
-
+                                    if (questions.Any(q => q.Id == idQuestion.Value))
+                                    {
+                                        var correctAnswers = questions.Where(q => q.Id == idQuestion.Value).FirstOrDefault().CorrectAnswers;
+                                        foreach (string ans in correctAnswers) SeleniumMethods.Click(driver, ans, "Id");
+                                    }
+                                    else
+                                    {
+                                        idAnswerSelected = att.Value;
+                                        SeleniumMethods.Click(driver, att.Value, "Id");
+                                        return;
+                                    }
                                 }
-                                idAnswerValue = idAnswer.Value;
-                                idAnswerValueTimes = 1;
+                                idQuestionValue = idQuestion.Value;
+                                idQuestionValueTimes = 1;
                             }
-                            else idAnswerValueTimes++;
+                            else idQuestionValueTimes++;
+                            question.Answers.Add(att.Value);
                         }
                     }
                 }
+                question.Id = idQuestionValue;
             }
-            driver.Close();
         }
     }
 }
