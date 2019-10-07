@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace AutoTPs
 {
@@ -35,6 +36,11 @@ namespace AutoTPs
 
             while (mark < 100)
             {
+                List<Question> questionsCurrentTest = new List<Question>();
+
+                //take a breath
+                Task.Delay(1500);
+
                 //take it
                 SeleniumMethods.Click(driver, "[href*='/courses/5379/quizzes/19372/take?user_id=90628']", "HRef");
 
@@ -43,10 +49,10 @@ namespace AutoTPs
                 doc.LoadHtml(driver.PageSource);
 
                 //load questions
-                LoadQuestions(doc, questions);
+                LoadQuestions(doc, questions, questionsCurrentTest);
 
                 //complete with resolved questions
-                foreach(Question q in questions)
+                foreach(Question q in questionsCurrentTest)
                 {
                     if(q.Resolved == true)
                     {
@@ -54,12 +60,13 @@ namespace AutoTPs
                         expectedMark += 5;
                     }
                 }
+                Console.WriteLine($"Expected mark: {expectedMark}");
 
                 //select an unresolved question
-                Question unresolvedQ = questions.Where(q => q.Resolved == false).FirstOrDefault();
+                Question unresolvedQ = questionsCurrentTest.Where(q => q.Resolved == false).FirstOrDefault();
 
                 //select an answer
-                string answerSelected = unresolvedQ.Answers.FirstOrDefault();
+                string answerSelected = unresolvedQ.NoAttemptsAnswers.FirstOrDefault();
 
                 SeleniumMethods.Click(driver, answerSelected, "Id");
 
@@ -69,6 +76,9 @@ namespace AutoTPs
                 //accept the alert of incomplete answers
                 driver.SwitchTo().Alert().Accept();
 
+                //take a breath
+                Task.Delay(3000);
+
                 //scarp results page
                 doc.LoadHtml(driver.PageSource);
 
@@ -77,30 +87,33 @@ namespace AutoTPs
                 {
                     mark = Convert.ToDouble(Nodo.InnerHtml);
                 }
+                Console.WriteLine($"Mark: {mark}");
 
-                if(unresolvedQ.Type == "true_false_question" || unresolvedQ.Type == "multiple_choice_question")
+                //verify answer
+                switch (mark - expectedMark)
                 {
-                    if (mark - expectedMark == 5)
-                    {
+                    case 0:
+                        unresolvedQ.NoAttemptsAnswers.Remove(answerSelected);
+                        break;
+                    case 5:
                         unresolvedQ.CorrectAnswers.Add(answerSelected);
-                        unresolvedQ.WrongAnswers.Add(unresolvedQ.Answers.Where(a => a != answerSelected).FirstOrDefault());
+                        unresolvedQ.NoAttemptsAnswers.Remove(answerSelected);
                         unresolvedQ.Resolved = true;
-                    }
-                    else
-                    {
-                        unresolvedQ.CorrectAnswers.Add(unresolvedQ.Answers.Where(a => a != answerSelected).FirstOrDefault());
-                        unresolvedQ.WrongAnswers.Add(answerSelected);
-                        unresolvedQ.Resolved = true;
-                    }
-                }                
+                        break;
+                    default:
+                        unresolvedQ.CorrectAnswers.Add(answerSelected);
+                        unresolvedQ.NoAttemptsAnswers.Remove(answerSelected);
+                        break;
+                }
             }
 
             driver.Close();
         }
 
-        private static void LoadQuestions(HtmlDocument doc, List<Question> questions)
+        private static void LoadQuestions(HtmlDocument doc, List<Question> questions, List<Question> questionsCurrentTest)
         {
             string idQuestionValue = string.Empty;
+            List<Question> newQuestions = new List<Question>();
             foreach (var Nodo in doc.DocumentNode.SelectNodes("//input[@id]"))
             {
                 HtmlAttributeCollection atts = Nodo.Attributes;
@@ -116,21 +129,29 @@ namespace AutoTPs
                     Question question = new Question()
                     {
                         Id = idQuestionValue,
-                        Type = type
+                        Type = type,
+                        Answers = {answerId}
                     };
-                    question.Answers.Add(answerId);
-                    questions.Add(question);
+                    newQuestions.Add(question);
                 }
                 else
                 {
-                    Question question = questions.Where(q => q.Id == idQuestionValue).FirstOrDefault();
+                    Question question = newQuestions.Where(q => q.Id == idQuestionValue).FirstOrDefault();
+                    if (question == null)
+                    {
+                        question = questions.Where(q => q.Id == idQuestionValue).FirstOrDefault();
+                        questionsCurrentTest.Add(question);
+                    }
                     if (!question.FullyLoaded) question.Answers.Add(answerId);
                 }
             }
-            foreach(Question q in questions)
+            foreach(Question q in newQuestions)
             {
                 q.FullyLoaded = true;
+                q.NoAttemptsAnswers = q.Answers;
                 if (q.Answers.Count == 2) q.Type = "true_false_question";
+                questionsCurrentTest.Add(q);
+                questions.Add(q);
             }
         }
     }
