@@ -28,6 +28,7 @@ namespace AutoTPs
             //SeleniumMethods.Click(driver, "[href*='/courses/5379/modules/items/100155']", "HRef");
             driver.Navigate().GoToUrl("https://siglo21.instructure.com/courses/5379/quizzes/19372?module_item_id=100155");
 
+            //initialization
             List<Question> questions = new List<Question>();
             double mark = 0;
             double expectedMark = 0;
@@ -37,7 +38,7 @@ namespace AutoTPs
                 //take it
                 SeleniumMethods.Click(driver, "[href*='/courses/5379/quizzes/19372/take?user_id=90628']", "HRef");
 
-                //scrap it
+                //scrap test page
                 HtmlDocument doc = new HtmlDocument();
                 doc.LoadHtml(driver.PageSource);
 
@@ -62,29 +63,36 @@ namespace AutoTPs
 
                 SeleniumMethods.Click(driver, answerSelected, "Id");
 
-
+                //submit
                 SeleniumMethods.Click(driver, "submit_quiz_button", "Id");
 
+                //accept the alert of incomplete answers
                 driver.SwitchTo().Alert().Accept();
 
+                //scarp results page
                 doc.LoadHtml(driver.PageSource);
 
+                //save mark
                 foreach (var Nodo in doc.DocumentNode.CssSelect(".score_value"))
                 {
                     mark = Convert.ToDouble(Nodo.InnerHtml);
                 }
-                if (mark == 5)
+
+                if(unresolvedQ.Type == "true_false_question" || unresolvedQ.Type == "multiple_choice_question")
                 {
-                    unresolvedQ.CorrectAnswers.Add(answerSelected);
-                    unresolvedQ.WrongAnswers.Add(unresolvedQ.Answers.Where(a => a != answerSelected).FirstOrDefault());
-                    unresolvedQ.Resolved = true;
-                }
-                else
-                {
-                    unresolvedQ.CorrectAnswers.Add(unresolvedQ.Answers.Where(a => a != answerSelected).FirstOrDefault());
-                    unresolvedQ.WrongAnswers.Add(answerSelected);
-                    unresolvedQ.Resolved = true;
-                }
+                    if (mark - expectedMark == 5)
+                    {
+                        unresolvedQ.CorrectAnswers.Add(answerSelected);
+                        unresolvedQ.WrongAnswers.Add(unresolvedQ.Answers.Where(a => a != answerSelected).FirstOrDefault());
+                        unresolvedQ.Resolved = true;
+                    }
+                    else
+                    {
+                        unresolvedQ.CorrectAnswers.Add(unresolvedQ.Answers.Where(a => a != answerSelected).FirstOrDefault());
+                        unresolvedQ.WrongAnswers.Add(answerSelected);
+                        unresolvedQ.Resolved = true;
+                    }
+                }                
             }
 
             driver.Close();
