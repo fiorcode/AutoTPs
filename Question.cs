@@ -11,7 +11,7 @@ namespace AutoTPs
             FullyLoaded = false;
             Resolved = false;
             Answers = new List<string>();
-            WrongAnswers = new List<string>();
+            NoAttemptsAnswers = new List<string>();
             CorrectAnswers = new List<string>();
         }
 
@@ -25,7 +25,7 @@ namespace AutoTPs
         
         public List<string> Answers { get; set; }
 
-        public List<string> WrongAnswers { get; set; }
+        public List<string> NoAttemptsAnswers { get; set; }
 
         public List<string> CorrectAnswers { get; set; }
 
