@@ -17,7 +17,7 @@ namespace AutoTPs
             IWebDriver driver = new ChromeDriver(".");
 
             //login
-            driver.Navigate().GoToUrl("https://siglo21.instructure.com/login/canvas");
+            driver.Navigate().GoToUrl("https://siglo21.instructure.com");
             SeleniumMethods.EnterText(driver, "pseudonym_session[unique_id]", "lperez23", "Name");
             SeleniumMethods.EnterText(driver, "pseudonym_session[password]", "fumigaRola70.", "Name");
             SeleniumMethods.Click(driver, "Button--login", "ClassName");
@@ -39,7 +39,7 @@ namespace AutoTPs
                 List<Question> questionsCurrentTest = new List<Question>();
 
                 //take a breath
-                Task.Delay(1500);
+                Task.Delay(1000);
 
                 //take it
                 SeleniumMethods.Click(driver, "[href*='/courses/5379/quizzes/19372/take?user_id=90628']", "HRef");
@@ -56,7 +56,7 @@ namespace AutoTPs
                 {
                     if(q.Resolved == true)
                     {
-                        foreach (string a in q.Answers) SeleniumMethods.Click(driver, a, "Id");
+                        foreach (string a in q.CorrectAnswers) SeleniumMethods.Click(driver, a, "Id");
                         expectedMark += 5;
                     }
                 }
@@ -77,7 +77,7 @@ namespace AutoTPs
                 driver.SwitchTo().Alert().Accept();
 
                 //take a breath
-                Task.Delay(3000);
+                Task.Delay(1000);
 
                 //scarp results page
                 doc.LoadHtml(driver.PageSource);
