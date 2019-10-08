@@ -32,11 +32,11 @@ namespace AutoTPs
             //initialization
             List<Question> questions = new List<Question>();
             double mark = 0;
-            double expectedMark = 0;
 
             while (mark < 100)
             {
                 List<Question> questionsCurrentTest = new List<Question>();
+                double expectedMark = 0;
 
                 //take a breath
                 Task.Delay(1000);
@@ -69,6 +69,9 @@ namespace AutoTPs
                 string answerSelected = unresolvedQ.NoAttemptsAnswers.FirstOrDefault();
 
                 SeleniumMethods.Click(driver, answerSelected, "Id");
+
+                //take a breath
+                Task.Delay(1000);
 
                 //submit
                 SeleniumMethods.Click(driver, "submit_quiz_button", "Id");
@@ -122,27 +125,33 @@ namespace AutoTPs
                 idQuestionValue = regex.Match(answerId).Value;
                 if (!questions.Any(q => q.Id == idQuestionValue))
                 {
-                    string answerType = atts.Where(a => a.Name.ToLower() == "type").FirstOrDefault().Value;
-                    string type;
-                    if (answerType == "checkbox") type = "multiple_answers_question";
-                    else type = "multiple_choice_question";
-                    Question question = new Question()
+                    if(!newQuestions.Any(q => q.Id == idQuestionValue))
                     {
-                        Id = idQuestionValue,
-                        Type = type,
-                        Answers = {answerId}
-                    };
-                    newQuestions.Add(question);
+                        string answerType = atts.Where(a => a.Name.ToLower() == "type").FirstOrDefault().Value;
+                        string type;
+                        if (answerType == "checkbox") type = "multiple_answers_question";
+                        else type = "multiple_choice_question";
+                        Question question = new Question()
+                        {
+                            Id = idQuestionValue,
+                            Type = type,
+                            Answers = { answerId }
+                        };
+                        newQuestions.Add(question);
+                    }
+                    else
+                    {
+                        Question question = newQuestions.Where(q => q.Id == idQuestionValue).FirstOrDefault();
+                        question.Answers.Add(answerId);
+                    }
                 }
                 else
                 {
-                    Question question = newQuestions.Where(q => q.Id == idQuestionValue).FirstOrDefault();
-                    if (question == null)
+                    if(questionsCurrentTest.Where(q => q.Id == idQuestionValue).FirstOrDefault() == null)
                     {
-                        question = questions.Where(q => q.Id == idQuestionValue).FirstOrDefault();
+                        Question question = questions.Where(q => q.Id == idQuestionValue).FirstOrDefault();
                         questionsCurrentTest.Add(question);
                     }
-                    if (!question.FullyLoaded) question.Answers.Add(answerId);
                 }
             }
             foreach(Question q in newQuestions)
@@ -153,6 +162,7 @@ namespace AutoTPs
                 questionsCurrentTest.Add(q);
                 questions.Add(q);
             }
+            string control = "control";
         }
     }
 }
