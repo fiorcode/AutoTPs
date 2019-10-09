@@ -1,12 +1,10 @@
-﻿using HtmlAgilityPack;
-using OpenQA.Selenium;
-using OpenQA.Selenium.Chrome;
-using ScrapySharp.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using HtmlAgilityPack;
+using ScrapySharp.Extensions;
 
 namespace AutoTPs
 {
@@ -14,20 +12,16 @@ namespace AutoTPs
     {
         static void Main(string[] args)
         {
-            IWebDriver driver = new ChromeDriver(".");
+            DoLogin("https://siglo21.instructure.com");
 
-            //login
-            driver.Navigate().GoToUrl("https://siglo21.instructure.com");
-            SeleniumMethods.EnterText(driver, "pseudonym_session[unique_id]", "lperez23", "Name");
-            SeleniumMethods.EnterText(driver, "pseudonym_session[password]", "fumigaRola70.", "Name");
-            SeleniumMethods.Click(driver, "Button--login", "ClassName");
+            GetCourses();
 
             //select GL
             //SeleniumMethods.Click(driver, "[href*='/courses/5379']", "HRef");
 
             //go to TP1
             //SeleniumMethods.Click(driver, "[href*='/courses/5379/modules/items/100155']", "HRef");
-            driver.Navigate().GoToUrl("https://siglo21.instructure.com/courses/5379/quizzes/19372?module_item_id=100155");
+            Driver.GetInstance.WebDrive.Navigate().GoToUrl("https://siglo21.instructure.com/courses/5379/quizzes/19372?module_item_id=100155");
 
             //initialization
             List<Question> questions = new List<Question>();
@@ -42,11 +36,11 @@ namespace AutoTPs
                 Task.Delay(1000);
 
                 //take it
-                SeleniumMethods.Click(driver, "[href*='/courses/5379/quizzes/19372/take?user_id=90628']", "HRef");
+                Methods.Click("[href*='/courses/5379/quizzes/19372/take?user_id=90628']", "HRef");
 
                 //scrap test page
                 HtmlDocument doc = new HtmlDocument();
-                doc.LoadHtml(driver.PageSource);
+                doc.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
 
                 //load questions
                 LoadQuestions(doc, questions, questionsCurrentTest);
@@ -56,7 +50,7 @@ namespace AutoTPs
                 {
                     if(q.Resolved == true)
                     {
-                        foreach (string a in q.CorrectAnswers) SeleniumMethods.Click(driver, a, "Id");
+                        foreach (string ans in q.CorrectAnswers) Methods.Click(ans, "Id");
                         expectedMark += 5;
                     }
                 }
@@ -68,22 +62,22 @@ namespace AutoTPs
                 //select an answer
                 string answerSelected = unresolvedQ.NoAttemptsAnswers.FirstOrDefault();
 
-                SeleniumMethods.Click(driver, answerSelected, "Id");
+                Methods.Click(answerSelected, "Id");
 
                 //take a breath
                 Task.Delay(1000);
 
                 //submit
-                SeleniumMethods.Click(driver, "submit_quiz_button", "Id");
+                Methods.Click("submit_quiz_button", "Id");
 
                 //accept the alert of incomplete answers
-                driver.SwitchTo().Alert().Accept();
+                Driver.GetInstance.WebDrive.SwitchTo().Alert().Accept();
 
                 //take a breath
                 Task.Delay(1000);
 
                 //scarp results page
-                doc.LoadHtml(driver.PageSource);
+                doc.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
 
                 //save mark
                 foreach (var Nodo in doc.DocumentNode.CssSelect(".score_value"))
@@ -110,7 +104,21 @@ namespace AutoTPs
                 }
             }
 
-            driver.Close();
+            Driver.GetInstance.WebDrive.Close();
+        }
+
+        private static void DoLogin(string loginUrl)
+        {
+            Driver.GetInstance.WebDrive.Navigate().GoToUrl(loginUrl);
+            Methods.EnterText("pseudonym_session[unique_id]", "lperez23", "Name");
+            Methods.EnterText("pseudonym_session[password]", "fumigaRola70.", "Name");
+            Methods.Click("Button--login", "ClassName");
+        }
+
+        private static void GetCourses()
+        {
+            HtmlDocument boardHtml = new HtmlDocument();
+            boardHtml.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
         }
 
         private static void LoadQuestions(HtmlDocument doc, List<Question> questions, List<Question> questionsCurrentTest)
@@ -162,7 +170,6 @@ namespace AutoTPs
                 questionsCurrentTest.Add(q);
                 questions.Add(q);
             }
-            string control = "control";
         }
     }
 }
