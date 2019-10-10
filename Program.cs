@@ -10,100 +10,96 @@ namespace AutoTPs
 {
     class Program
     {
+        private static string baseUrl = "https://siglo21.instructure.com";
         static void Main(string[] args)
         {
-            DoLogin("https://siglo21.instructure.com");
+            DoLogin(baseUrl);
 
-            GetCourses();
-
-            //select GL
-            //SeleniumMethods.Click(driver, "[href*='/courses/5379']", "HRef");
-
-            //go to TP1
-            //SeleniumMethods.Click(driver, "[href*='/courses/5379/modules/items/100155']", "HRef");
-            Driver.GetInstance.WebDrive.Navigate().GoToUrl("https://siglo21.instructure.com/courses/5379/quizzes/19372?module_item_id=100155");
-
-            //initialization
-            List<Question> questions = new List<Question>();
-            double mark = 0;
-
-            while (mark < 100)
+            List<string> Courses = GetCourses();
+            
+            foreach(string c in Courses)
             {
-                List<Question> questionsCurrentTest = new List<Question>();
-                double expectedMark = 0;
-
-                //take a breath
-                Task.Delay(1000);
-
-                //take it
-                Methods.Click("[href*='/courses/5379/quizzes/19372/take?user_id=90628']", "HRef");
-
-                //scrap test page
-                HtmlDocument doc = new HtmlDocument();
-                doc.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
-
-                //load questions
-                LoadQuestions(doc, questions, questionsCurrentTest);
-
-                //complete with resolved questions
-                foreach(Question q in questionsCurrentTest)
+                Driver.GetInstance.WebDrive.Navigate().GoToUrl($"{baseUrl}{c}");
+                List<string> tpLinks = GetTPLinks();
+                foreach(string t in tpLinks)
                 {
-                    if(q.Resolved == true)
+                    Driver.GetInstance.WebDrive.Navigate().GoToUrl($"{baseUrl}{t}");
+                    TP tp = new TP();
+
+                    while (tp.LastMark < 100)
                     {
-                        foreach (string ans in q.CorrectAnswers) Methods.Click(ans, "Id");
-                        expectedMark += 5;
+                        //take it
+                        Methods.Click("[href*='/courses/5379/quizzes/19372/take?user_id=90628']", "HRef");
+
+                        //load questions
+                        LoadQuestions(tp);
+
+                        //complete with resolved questions
+                        foreach (Question q in tp.CurrentQuestions)
+                        {
+                            if (q.Resolved == true)
+                            {
+                                foreach (string ans in q.CorrectAnswers) Methods.Click(ans, "Id");
+                                tp.CurrentExpectedMark += 5;
+                            }
+                        }
+                        Console.WriteLine($"Expected mark: {tp.CurrentExpectedMark}");
+
+                        //select an unresolved question
+                        Question unresolvedQ = tp.CurrentQuestions.Where(q => q.Resolved == false).FirstOrDefault();
+
+                        //select an answer
+                        string answerSelected = unresolvedQ.NoAttemptsAnswers.FirstOrDefault();
+
+                        Methods.Click(answerSelected, "Id");
+
+                        //take a breath
+                        Task.Delay(1000);
+
+                        //submit
+                        Methods.Click("submit_quiz_button", "Id");
+
+                        //accept the alert of incomplete answers
+                        Driver.GetInstance.WebDrive.SwitchTo().Alert().Accept();
+
+                        //take a breath
+                        Task.Delay(1000);
+
+                        //scarp results page
+                        HtmlDocument doc = new HtmlDocument();
+                        doc.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
+
+                        //save mark
+                        /*foreach (var Nodo in doc.DocumentNode.CssSelect(".score_value"))
+                        {
+                            mark = Convert.ToDouble(Nodo.InnerHtml);
+                        }*/
+                        double mark = Convert.ToDouble(doc
+                            .DocumentNode
+                            .CssSelect(".score_value")
+                            .FirstOrDefault()
+                            .InnerHtml);
+                        Console.WriteLine($"Mark: {mark}");
+
+                        //verify answer
+                        switch (mark - tp.CurrentExpectedMark)
+                        {
+                            case 0:
+                                unresolvedQ.NoAttemptsAnswers.Remove(answerSelected);
+                                break;
+                            case 5:
+                                unresolvedQ.CorrectAnswers.Add(answerSelected);
+                                unresolvedQ.NoAttemptsAnswers.Remove(answerSelected);
+                                unresolvedQ.Resolved = true;
+                                break;
+                            default:
+                                unresolvedQ.CorrectAnswers.Add(answerSelected);
+                                unresolvedQ.NoAttemptsAnswers.Remove(answerSelected);
+                                break;
+                        }
                     }
                 }
-                Console.WriteLine($"Expected mark: {expectedMark}");
-
-                //select an unresolved question
-                Question unresolvedQ = questionsCurrentTest.Where(q => q.Resolved == false).FirstOrDefault();
-
-                //select an answer
-                string answerSelected = unresolvedQ.NoAttemptsAnswers.FirstOrDefault();
-
-                Methods.Click(answerSelected, "Id");
-
-                //take a breath
-                Task.Delay(1000);
-
-                //submit
-                Methods.Click("submit_quiz_button", "Id");
-
-                //accept the alert of incomplete answers
-                Driver.GetInstance.WebDrive.SwitchTo().Alert().Accept();
-
-                //take a breath
-                Task.Delay(1000);
-
-                //scarp results page
-                doc.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
-
-                //save mark
-                foreach (var Nodo in doc.DocumentNode.CssSelect(".score_value"))
-                {
-                    mark = Convert.ToDouble(Nodo.InnerHtml);
-                }
-                Console.WriteLine($"Mark: {mark}");
-
-                //verify answer
-                switch (mark - expectedMark)
-                {
-                    case 0:
-                        unresolvedQ.NoAttemptsAnswers.Remove(answerSelected);
-                        break;
-                    case 5:
-                        unresolvedQ.CorrectAnswers.Add(answerSelected);
-                        unresolvedQ.NoAttemptsAnswers.Remove(answerSelected);
-                        unresolvedQ.Resolved = true;
-                        break;
-                    default:
-                        unresolvedQ.CorrectAnswers.Add(answerSelected);
-                        unresolvedQ.NoAttemptsAnswers.Remove(answerSelected);
-                        break;
-                }
             }
-
             Driver.GetInstance.WebDrive.Close();
         }
 
@@ -115,23 +111,58 @@ namespace AutoTPs
             Methods.Click("Button--login", "ClassName");
         }
 
-        private static void GetCourses()
+        private static List<string> GetCourses()
         {
             HtmlDocument boardHtml = new HtmlDocument();
             boardHtml.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
-        }
-
-        private static void LoadQuestions(HtmlDocument doc, List<Question> questions, List<Question> questionsCurrentTest)
-        {
-            string idQuestionValue = string.Empty;
-            List<Question> newQuestions = new List<Question>();
-            foreach (var Nodo in doc.DocumentNode.SelectNodes("//input[@id]"))
+            List<string> Courses = new List<string>();
+            foreach (var Nodo in boardHtml.DocumentNode.CssSelect(".ic-DashboardCard__link"))
             {
                 HtmlAttributeCollection atts = Nodo.Attributes;
+                Courses.Add(atts.Where(a => a.Name.ToLower() == "href").FirstOrDefault().Value);
+            }
+            return Courses;
+        }
+
+        private static List<string> GetTPLinks()
+        {
+            HtmlDocument boardHtml = new HtmlDocument();
+            boardHtml.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
+            List<string> TPLinks = new List<string>();
+            foreach (var Nodo in boardHtml.DocumentNode.CssSelect(".ig-title.title.item_link"))
+            {
+                HtmlAttributeCollection atts = Nodo.Attributes;
+                string title = atts.Where(a => a.Name.ToLower() == "title").FirstOrDefault().Value;
+                if (title.Contains("Trabajo"))
+                {
+                    TPLinks.Add(atts.Where(a => a.Name.ToLower() == "href").FirstOrDefault().Value);
+                }
+            }
+            return TPLinks;
+        }
+
+        private static void LoadQuestions(TP tp)
+        {
+            //scrap TP page
+            HtmlDocument doc = new HtmlDocument();
+            doc.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
+
+            //initialize
+            tp.CurrentQuestions = new List<Question>();
+            List<Question> newQuestions = new List<Question>();
+
+            //load each answer
+            foreach (var Nodo in doc.DocumentNode.SelectNodes("//input[@id]"))
+            {
+                //load answer <input> attributes
+                HtmlAttributeCollection atts = Nodo.Attributes;
+                //gets answer id
                 string answerId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
+                //gets question id and keeps only the number
                 Regex regex = new Regex(@"(?<=question_)(.+?)(?=_)");
-                idQuestionValue = regex.Match(answerId).Value;
-                if (!questions.Any(q => q.Id == idQuestionValue))
+                string idQuestionValue = regex.Match(answerId).Value;
+                //checks if it was previously loaded
+                if (!tp.Questions.Any(q => q.Id == idQuestionValue))
                 {
                     if(!newQuestions.Any(q => q.Id == idQuestionValue))
                     {
@@ -155,10 +186,10 @@ namespace AutoTPs
                 }
                 else
                 {
-                    if(questionsCurrentTest.Where(q => q.Id == idQuestionValue).FirstOrDefault() == null)
+                    if(tp.CurrentQuestions.Where(q => q.Id == idQuestionValue).FirstOrDefault() == null)
                     {
-                        Question question = questions.Where(q => q.Id == idQuestionValue).FirstOrDefault();
-                        questionsCurrentTest.Add(question);
+                        Question question = tp.Questions.Where(q => q.Id == idQuestionValue).FirstOrDefault();
+                        tp.CurrentQuestions.Add(question);
                     }
                 }
             }
@@ -167,8 +198,8 @@ namespace AutoTPs
                 q.FullyLoaded = true;
                 q.NoAttemptsAnswers = q.Answers;
                 if (q.Answers.Count == 2) q.Type = "true_false_question";
-                questionsCurrentTest.Add(q);
-                questions.Add(q);
+                tp.CurrentQuestions.Add(q);
+                tp.Questions.Add(q);
             }
         }
     }
