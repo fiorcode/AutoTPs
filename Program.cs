@@ -149,9 +149,19 @@ namespace AutoTPs
 
             //initialize
             tp.CurrentQuestions = new List<Question>();
-            List<Question> newQuestions = new List<Question>();
 
-            //load each answer
+            foreach (var Nodo in doc.DocumentNode.CssSelect(".display_question"))
+            {
+                HtmlAttributeCollection atts = Nodo.Attributes;
+                string questionId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
+                if (tp.Questions.Any(q => q.Id == questionId))
+                {
+                    tp.CurrentQuestions.Add(tp.Questions.Where(q => q.Id == questionId).FirstOrDefault());
+                }
+                else tp.CurrentQuestions.Add(new Question() { Id = questionId });
+            }
+
+            //read answers
             foreach (var Nodo in doc.DocumentNode.SelectNodes("//input[@id]"))
             {
                 //load answer <input> attributes
@@ -160,11 +170,25 @@ namespace AutoTPs
                 string answerId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
                 //gets question id and keeps only the number
                 Regex regex = new Regex(@"(?<=question_)(.+?)(?=_)");
-                string idQuestionValue = regex.Match(answerId).Value;
+                string idQuestion = regex.Match(answerId).Value;
                 //checks if it was previously loaded
-                if (!tp.Questions.Any(q => q.Id == idQuestionValue))
+            }
+
+            List<Question> newQuestions = new List<Question>();
+
+            foreach (var Nodo in doc.DocumentNode.SelectNodes("//input[@id]"))
+            {
+                //load answer <input> attributes
+                HtmlAttributeCollection atts = Nodo.Attributes;
+                //gets answer id
+                string answerId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
+                //gets question id and keeps only the number
+                Regex regex = new Regex(@"(?<=question_)(.+?)(?=_)");
+                string idQuestion = regex.Match(answerId).Value;
+                //checks if it was previously loaded
+                if (!tp.Questions.Any(q => q.Id == idQuestion))
                 {
-                    if(!newQuestions.Any(q => q.Id == idQuestionValue))
+                    if(!newQuestions.Any(q => q.Id == idQuestion))
                     {
                         string answerType = atts.Where(a => a.Name.ToLower() == "type").FirstOrDefault().Value;
                         string type;
@@ -172,7 +196,7 @@ namespace AutoTPs
                         else type = "multiple_choice_question";
                         Question question = new Question()
                         {
-                            Id = idQuestionValue,
+                            Id = idQuestion,
                             Type = type,
                             Answers = { answerId }
                         };
@@ -180,15 +204,15 @@ namespace AutoTPs
                     }
                     else
                     {
-                        Question question = newQuestions.Where(q => q.Id == idQuestionValue).FirstOrDefault();
+                        Question question = newQuestions.Where(q => q.Id == idQuestion).FirstOrDefault();
                         question.Answers.Add(answerId);
                     }
                 }
                 else
                 {
-                    if(tp.CurrentQuestions.Where(q => q.Id == idQuestionValue).FirstOrDefault() == null)
+                    if(tp.CurrentQuestions.Where(q => q.Id == idQuestion).FirstOrDefault() == null)
                     {
-                        Question question = tp.Questions.Where(q => q.Id == idQuestionValue).FirstOrDefault();
+                        Question question = tp.Questions.Where(q => q.Id == idQuestion).FirstOrDefault();
                         tp.CurrentQuestions.Add(question);
                     }
                 }
@@ -197,7 +221,7 @@ namespace AutoTPs
             {
                 q.FullyLoaded = true;
                 q.NoAttemptsAnswers = q.Answers;
-                if (q.Answers.Count == 2) q.Type = "true_false_question";
+                if (q.Type == "multiple_choice_question" && q.Answers.Count == 2) q.Type = "true_false_question";
                 tp.CurrentQuestions.Add(q);
                 tp.Questions.Add(q);
             }
