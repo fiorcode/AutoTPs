@@ -149,29 +149,30 @@ namespace AutoTPs
 
             //initialize
             tp.CurrentQuestions = new List<Question>();
-
-            foreach (var Nodo in doc.DocumentNode.CssSelect(".display_question"))
+            
+            //load old questions and create new ones
+            /*foreach (var Node in doc.DocumentNode.CssSelect(".display_question"))
             {
-                HtmlAttributeCollection atts = Nodo.Attributes;
+                HtmlAttributeCollection atts = Node.Attributes;
                 string questionId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
                 if (tp.Questions.Any(q => q.Id == questionId))
                 {
                     tp.CurrentQuestions.Add(tp.Questions.Where(q => q.Id == questionId).FirstOrDefault());
                 }
                 else tp.CurrentQuestions.Add(new Question() { Id = questionId });
-            }
+            }*/
 
-            //read answers
-            foreach (var Nodo in doc.DocumentNode.SelectNodes("//input[@id]"))
+            foreach (var Node in doc.DocumentNode.SelectNodes("//input[@id]"))
             {
                 //load answer <input> attributes
-                HtmlAttributeCollection atts = Nodo.Attributes;
+                HtmlAttributeCollection atts = Node.Attributes;
                 //gets answer id
                 string answerId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
-                //gets question id and keeps only the number
-                Regex regex = new Regex(@"(?<=question_)(.+?)(?=_)");
-                string idQuestion = regex.Match(answerId).Value;
-                //checks if it was previously loaded
+                string type = atts.Where(a => a.Name.ToLower() == "type").FirstOrDefault().Value;
+                foreach (Question newQ in tp.CurrentQuestions.Where(q => q.FullyLoaded == false))
+                {
+                    if (answerId.Contains(newQ.Id)) newQ.Answers.Add(answerId);
+                }
             }
 
             List<Question> newQuestions = new List<Question>();
