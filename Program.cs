@@ -149,81 +149,48 @@ namespace AutoTPs
 
             //initialize
             tp.CurrentQuestions = new List<Question>();
-            
-            //load old questions and create new ones
-            /*foreach (var Node in doc.DocumentNode.CssSelect(".display_question"))
-            {
-                HtmlAttributeCollection atts = Node.Attributes;
-                string questionId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
-                if (tp.Questions.Any(q => q.Id == questionId))
-                {
-                    tp.CurrentQuestions.Add(tp.Questions.Where(q => q.Id == questionId).FirstOrDefault());
-                }
-                else tp.CurrentQuestions.Add(new Question() { Id = questionId });
-            }*/
 
+            //go for each answer
             foreach (var Node in doc.DocumentNode.SelectNodes("//input[@id]"))
             {
                 //load answer <input> attributes
                 HtmlAttributeCollection atts = Node.Attributes;
                 //gets answer id
                 string answerId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
-                string type = atts.Where(a => a.Name.ToLower() == "type").FirstOrDefault().Value;
-                foreach (Question newQ in tp.CurrentQuestions.Where(q => q.FullyLoaded == false))
-                {
-                    if (answerId.Contains(newQ.Id)) newQ.Answers.Add(answerId);
-                }
-            }
-
-            List<Question> newQuestions = new List<Question>();
-
-            foreach (var Nodo in doc.DocumentNode.SelectNodes("//input[@id]"))
-            {
-                //load answer <input> attributes
-                HtmlAttributeCollection atts = Nodo.Attributes;
-                //gets answer id
-                string answerId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
                 //gets question id and keeps only the number
                 Regex regex = new Regex(@"(?<=question_)(.+?)(?=_)");
                 string idQuestion = regex.Match(answerId).Value;
                 //checks if it was previously loaded
-                if (!tp.Questions.Any(q => q.Id == idQuestion))
+                if (tp.Questions.Any(q => q.Id == idQuestion))
                 {
-                    if(!newQuestions.Any(q => q.Id == idQuestion))
+                    tp.CurrentQuestions.Add(tp.Questions.Where(q => q.Id == idQuestion).FirstOrDefault());
+                }
+                else
+                {
+                    if (tp.CurrentQuestions.Any(q => q.Id == idQuestion))
                     {
-                        string answerType = atts.Where(a => a.Name.ToLower() == "type").FirstOrDefault().Value;
+                        tp.CurrentQuestions.Where(q => q.Id == idQuestion).FirstOrDefault().Answers.Add(answerId);
+                    }
+                    else
+                    {
+                        //gets answer type
                         string type;
+                        string answerType = atts.Where(a => a.Name.ToLower() == "type").FirstOrDefault().Value;
                         if (answerType == "checkbox") type = "multiple_answers_question";
                         else type = "multiple_choice_question";
-                        Question question = new Question()
+                        tp.CurrentQuestions.Add(new Question()
                         {
                             Id = idQuestion,
                             Type = type,
                             Answers = { answerId }
-                        };
-                        newQuestions.Add(question);
-                    }
-                    else
-                    {
-                        Question question = newQuestions.Where(q => q.Id == idQuestion).FirstOrDefault();
-                        question.Answers.Add(answerId);
-                    }
-                }
-                else
-                {
-                    if(tp.CurrentQuestions.Where(q => q.Id == idQuestion).FirstOrDefault() == null)
-                    {
-                        Question question = tp.Questions.Where(q => q.Id == idQuestion).FirstOrDefault();
-                        tp.CurrentQuestions.Add(question);
+                        });
                     }
                 }
             }
-            foreach(Question q in newQuestions)
+            foreach(Question q in tp.CurrentQuestions)
             {
                 q.FullyLoaded = true;
-                q.NoAttemptsAnswers = q.Answers;
                 if (q.Type == "multiple_choice_question" && q.Answers.Count == 2) q.Type = "true_false_question";
-                tp.CurrentQuestions.Add(q);
                 tp.Questions.Add(q);
             }
         }
