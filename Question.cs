@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace AutoTPs
 {
@@ -8,9 +9,6 @@ namespace AutoTPs
         {
             FullyLoaded = false;
             Resolved = false;
-            Answers = new List<string>();
-            NoAttemptsAnswers = new List<string>();
-            CorrectAnswers = new List<string>();
         }
 
         public string Id { get; set; }
@@ -21,11 +19,9 @@ namespace AutoTPs
 
         public bool Resolved { get; set; }
         
-        public List<string> Answers { get; set; }
+        public List<Tuple<string, string>> Answers { get; set; }
 
-        public List<string> NoAttemptsAnswers { get; set; }
-
-        public List<string> CorrectAnswers { get; set; }
+        public List<Tuple<string, string>> CorrectAnswers { get; set; }
 
     }
 }
