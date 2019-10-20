@@ -39,19 +39,25 @@ namespace AutoTPs
                         {
                             if (q.Resolved == true)
                             {
-                                foreach (string ans in q.CorrectAnswers) Methods.Click(ans, "Id");
+                                foreach (Tuple<string, string> ans in q.CorrectAnswers) Methods.Click(ans.Item1, "Id");
                                 tp.CurrentExpectedMark += 5;
                             }
                         }
+
+                        //print the expected minimum mark
                         Console.WriteLine($"Expected mark: {tp.CurrentExpectedMark}");
 
                         //select an unresolved question
                         Question unresolvedQ = tp.CurrentQuestions.Where(q => q.Resolved == false).FirstOrDefault();
 
                         //select an answer
-                        string answerSelected = unresolvedQ.NoAttemptsAnswers.FirstOrDefault();
+                        Tuple<string, string> answerSelected = unresolvedQ.Answers.FirstOrDefault();
 
-                        Methods.Click(answerSelected, "Id");
+                        if (unresolvedQ.Type == "matching_question")
+                        {
+                            Methods.SelectDropDown(answerSelected.Item1, "Id", answerSelected.Item2);
+                        }
+                        else Methods.Click(answerSelected.Item1, "Id");
 
                         //take a breath
                         Task.Delay(1000);
@@ -85,16 +91,23 @@ namespace AutoTPs
                         switch (mark - tp.CurrentExpectedMark)
                         {
                             case 0:
-                                unresolvedQ.NoAttemptsAnswers.Remove(answerSelected);
+                                unresolvedQ.Answers.Remove(answerSelected);
                                 break;
                             case 5:
                                 unresolvedQ.CorrectAnswers.Add(answerSelected);
-                                unresolvedQ.NoAttemptsAnswers.Remove(answerSelected);
+                                unresolvedQ.Answers.Remove(answerSelected);
                                 unresolvedQ.Resolved = true;
                                 break;
                             default:
                                 unresolvedQ.CorrectAnswers.Add(answerSelected);
-                                unresolvedQ.NoAttemptsAnswers.Remove(answerSelected);
+                                if(unresolvedQ.Type == "matching_question")
+                                {
+                                    foreach(Tuple<string, string> ans in unresolvedQ.Answers.Where(a => a.Item1 == answerSelected.Item1))
+                                    {
+                                        unresolvedQ.Answers.Remove(ans);
+                                    }
+                                }
+                                else unresolvedQ.Answers.Remove(answerSelected);
                                 break;
                         }
                     }
@@ -169,11 +182,14 @@ namespace AutoTPs
                 {
                     if (tp.CurrentQuestions.Any(q => q.Id == idQuestion))
                     {
-                        tp.CurrentQuestions.Where(q => q.Id == idQuestion).FirstOrDefault().Answers.Add(answerId);
+                        tp.CurrentQuestions
+                            .Where(q => q.Id == idQuestion)
+                            .FirstOrDefault()
+                            .Answers.Add(Tuple.Create(answerId, string.Empty));
                     }
                     else
                     {
-                        //gets answer type
+                        //gets answer type, creates new question
                         string type;
                         string answerType = atts.Where(a => a.Name.ToLower() == "type").FirstOrDefault().Value;
                         if (answerType == "checkbox") type = "multiple_answers_question";
@@ -182,16 +198,62 @@ namespace AutoTPs
                         {
                             Id = idQuestion,
                             Type = type,
-                            Answers = { answerId }
+                            Answers = { Tuple.Create(answerId, string.Empty) }
                         });
                     }
                 }
             }
-            foreach(Question q in tp.CurrentQuestions)
+            foreach (var Node in doc.DocumentNode.SelectNodes("//select[@id]"))
             {
+                //load answer <input> attributes
+                HtmlAttributeCollection atts = Node.Attributes;
+                //gets answer id
+                string answerId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
+                //gets question id and keeps only the number
+                Regex regex = new Regex(@"(?<=question_)(.+?)(?=_)");
+                string idQuestion = regex.Match(answerId).Value;
+                //checks if it was previously loaded
+                if (tp.Questions.Any(q => q.Id == idQuestion))
+                {
+                    tp.CurrentQuestions.Add(tp.Questions.Where(q => q.Id == idQuestion).FirstOrDefault());
+                }
+                else
+                {
+                    if (tp.CurrentQuestions.Any(q => q.Id == idQuestion))
+                    {
+                        foreach (var SubNode in Node.Descendants("option"))
+                        {
+                            string option = SubNode.Attributes
+                                .Where(a => a.Name.ToLower() == "value")
+                                .FirstOrDefault().Value;
+                            tp.CurrentQuestions
+                                .Where(q => q.Id == idQuestion)
+                                .FirstOrDefault()
+                                .Answers.Add(Tuple.Create(answerId, option));
+                        }
+                    }
+                    else
+                    {
+                        Question newQ = new Question()
+                        {
+                            Id = idQuestion,
+                            Type = "matching_question"
+                        };
+                        foreach (var SubNode in Node.Descendants("option"))
+                        {
+                            string option = SubNode.Attributes
+                                .Where(a => a.Name.ToLower() == "value")
+                                .FirstOrDefault().Value;
+                            newQ.Answers.Add(Tuple.Create(answerId, option));
+                        }
+                        tp.CurrentQuestions.Add(newQ);
+                    }
+                }
+            }
+            foreach (Question q in tp.CurrentQuestions)
+            {
+                if(!q.FullyLoaded) tp.Questions.Add(q);
                 q.FullyLoaded = true;
-                if (q.Type == "multiple_choice_question" && q.Answers.Count == 2) q.Type = "true_false_question";
-                tp.Questions.Add(q);
             }
         }
     }
