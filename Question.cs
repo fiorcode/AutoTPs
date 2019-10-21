@@ -9,6 +9,8 @@ namespace AutoTPs
         {
             FullyLoaded = false;
             Resolved = false;
+            Answers = new List<Tuple<string, string>>();
+            CorrectAnswers = new List<Tuple<string, string>>();
         }
 
         public string Id { get; set; }
