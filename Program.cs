@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
+using OpenQA.Selenium;
 using ScrapySharp.Extensions;
 
 namespace AutoTPs
@@ -56,7 +57,7 @@ namespace AutoTPs
                         }
 
                         //print the expected minimum mark
-                        Console.WriteLine($"Expected mark: {tp.CurrentExpectedMark}");
+                        Console.WriteLine($"Minimum expected mark: {tp.CurrentExpectedMark}");
 
                         //select an unresolved question
                         Question unresolvedQ = tp.CurrentQuestions.Where(q => q.Resolved == false).FirstOrDefault();
@@ -89,43 +90,56 @@ namespace AutoTPs
                                 else Methods.Click(answerSelected.Item1, "Id");
                             }
                         }
+                        if(tp.LastMark > 70)
+                        {
+                            HtmlDocument page = new HtmlDocument();
+                            page.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
+                            page.Save($"{tp.CurrentExpectedMark}.html");
+                        }
 
                         //submit
                         Methods.Click("submit_quiz_button", "Id");
 
                         //take a breath
-                        Task.Delay(1000);
+                        //Task.Delay(1000);
 
-                        //accept the alert of incomplete answers
-                        Driver.GetInstance.WebDrive.SwitchTo().Alert().Accept();
+                        //check if exist an alert of incomplete answers and accept it
+                        if (isAlertPresent()) Driver.GetInstance.WebDrive.SwitchTo().Alert().Accept();
 
                         //take a breath
-                        Task.Delay(1000);
+                        //Task.Delay(1000);
 
                         //scarp results page
                         HtmlDocument doc = new HtmlDocument();
                         doc.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
 
                         //save mark
-                        double mark = Convert.ToDouble(doc
+                        tp.LastMark = Convert.ToDouble(doc
                             .DocumentNode
                             .CssSelect(".score_value")
                             .FirstOrDefault()
                             .InnerHtml);
-                        Console.WriteLine($"Mark: {mark}");
+                        Console.WriteLine($"Mark: {tp.LastMark}");
 
                         //verify answer
                         if (answerSelected != null)
                         {
-                            switch (mark - tp.CurrentExpectedMark)
+                            switch (tp.LastMark - tp.CurrentExpectedMark)
                             {
                                 case 0:
                                     unresolvedQ.Answers.Remove(answerSelected);
+                                    if(unresolvedQ.Answers.Count == 1)
+                                    {
+                                        unresolvedQ.CorrectAnswers.Add(unresolvedQ.Answers.FirstOrDefault());
+                                        unresolvedQ.Resolved = true;
+                                        Console.WriteLine($"Total of Q / Resolved: {tp.Questions.Count()}/{tp.Questions.Where(q => q.Resolved == true).Count()}");
+                            }
                                     break;
                                 case 5:
                                     unresolvedQ.CorrectAnswers.Add(answerSelected);
                                     unresolvedQ.Answers.Remove(answerSelected);
                                     unresolvedQ.Resolved = true;
+                                    Console.WriteLine($"Total of Q / Resolved: {tp.Questions.Count()}/{tp.Questions.Where(q => q.Resolved == true).Count()}");
                                     break;
                                 default:
                                     unresolvedQ.CorrectAnswers.Add(answerSelected);
@@ -200,103 +214,111 @@ namespace AutoTPs
             //scrap TP page
             HtmlDocument doc = new HtmlDocument();
             doc.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
-
-            //go for each answer
-            foreach (var Node in doc.DocumentNode.SelectNodes("//select[@id]"))
+            //go for each select answer
+            HtmlNodeCollection selectNodes = doc.DocumentNode.SelectNodes("//select[@id]");
+            if(selectNodes != null)
             {
-                //load answer <input> attributes
-                HtmlAttributeCollection atts = Node.Attributes;
-                //gets answer id
-                string answerId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
-                //gets question id and keeps only the number
-                Regex regex = new Regex(@"(?<=question_)(.+?)(?=_)");
-                string idQuestion = regex.Match(answerId).Value;
-                //checks if it was previously loaded
-                if (tp.Questions.Any(q => q.Id == idQuestion))
+                foreach (var Node in doc.DocumentNode.SelectNodes("//select[@id]"))
                 {
-                    if (!tp.CurrentQuestions.Any(q => q.Id == idQuestion))
+                    //load answer <input> attributes
+                    HtmlAttributeCollection atts = Node.Attributes;
+                    //gets answer id
+                    string answerId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
+                    //gets question id and keeps only the number
+                    Regex regex = new Regex(@"(?<=question_)(.+?)(?=_)");
+                    string idQuestion = regex.Match(answerId).Value;
+                    //checks if it was previously loaded
+                    if (tp.Questions.Any(q => q.Id == idQuestion))
                     {
-                        tp.CurrentQuestions.Add(tp.Questions.Where(q => q.Id == idQuestion).FirstOrDefault());
-                    }
-                }
-                else
-                {
-                    if (tp.CurrentQuestions.Any(q => q.Id == idQuestion))
-                    {
-                        foreach (var SubNode in Node.Descendants("option"))
+                        if (!tp.CurrentQuestions.Any(q => q.Id == idQuestion))
                         {
-                            string option = SubNode.Attributes
-                                .Where(a => a.Name.ToLower() == "value")
-                                .FirstOrDefault().Value;
-                            if (!string.IsNullOrEmpty(option))
-                            {
-                                tp.CurrentQuestions
-                                .Where(q => q.Id == idQuestion)
-                                .FirstOrDefault()
-                                .Answers.Add(Tuple.Create(answerId, option));
-                            }
+                            tp.CurrentQuestions.Add(tp.Questions.Where(q => q.Id == idQuestion).FirstOrDefault());
                         }
                     }
                     else
                     {
-                        Question newQ = new Question()
+                        if (tp.CurrentQuestions.Any(q => q.Id == idQuestion))
                         {
-                            Id = idQuestion,
-                            Type = "matching_question"
-                        };
-                        foreach (var SubNode in Node.Descendants("option"))
-                        {
-                            string option = SubNode.Attributes
-                                .Where(a => a.Name.ToLower() == "value")
-                                .FirstOrDefault().Value;
-                            if (!string.IsNullOrEmpty(option))
+                            foreach (var SubNode in Node.Descendants("option"))
                             {
-                                newQ.Answers.Add(Tuple.Create(answerId, option));
+                                string option = SubNode.Attributes
+                                    .Where(a => a.Name.ToLower() == "value")
+                                    .FirstOrDefault().Value;
+                                if (!string.IsNullOrEmpty(option))
+                                {
+                                    tp.CurrentQuestions
+                                    .Where(q => q.Id == idQuestion)
+                                    .FirstOrDefault()
+                                    .Answers.Add(Tuple.Create(answerId, option));
+                                }
                             }
                         }
-                        tp.CurrentQuestions.Add(newQ);
+                        else
+                        {
+                            Question newQ = new Question()
+                            {
+                                Id = idQuestion,
+                                Type = "matching_question"
+                            };
+                            foreach (var SubNode in Node.Descendants("option"))
+                            {
+                                string option = SubNode.Attributes
+                                    .Where(a => a.Name.ToLower() == "value")
+                                    .FirstOrDefault().Value;
+                                if (!string.IsNullOrEmpty(option))
+                                {
+                                    newQ.Answers.Add(Tuple.Create(answerId, option));
+                                }
+                            }
+                            tp.CurrentQuestions.Add(newQ);
+                        }
                     }
                 }
             }
-            foreach (var Node in doc.DocumentNode.SelectNodes("//input[@id]"))
+            //go for each input answer
+            HtmlNodeCollection inputNodes = doc.DocumentNode.SelectNodes("//input[@id]");
+            if(inputNodes != null)
             {
-                //load answer <input> attributes
-                HtmlAttributeCollection atts = Node.Attributes;
-                //gets answer id
-                string answerId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
-                //gets question id and keeps only the number
-                Regex regex = new Regex(@"(?<=question_)(.+?)(?=_)");
-                string idQuestion = regex.Match(answerId).Value;
-                //checks if it was previously loaded
-                if (tp.Questions.Any(q => q.Id == idQuestion))
+                foreach (var Node in doc.DocumentNode.SelectNodes("//input[@id]"))
                 {
-                    if (!tp.CurrentQuestions.Any(q => q.Id == idQuestion))
+                    //load answer <input> attributes
+                    HtmlAttributeCollection atts = Node.Attributes;
+                    //gets answer id
+                    string answerId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
+                    //gets question id and keeps only the number
+                    Regex regex = new Regex(@"(?<=question_)(.+?)(?=_)");
+                    string idQuestion = regex.Match(answerId).Value;
+                    //checks if it was previously loaded
+                    if (tp.Questions.Any(q => q.Id == idQuestion))
                     {
-                        tp.CurrentQuestions.Add(tp.Questions.Where(q => q.Id == idQuestion).FirstOrDefault());
-                    }
-                }
-                else
-                {
-                    if (tp.CurrentQuestions.Any(q => q.Id == idQuestion))
-                    {
-                        tp.CurrentQuestions
-                            .Where(q => q.Id == idQuestion)
-                            .FirstOrDefault()
-                            .Answers.Add(Tuple.Create(answerId, string.Empty));
+                        if (!tp.CurrentQuestions.Any(q => q.Id == idQuestion))
+                        {
+                            tp.CurrentQuestions.Add(tp.Questions.Where(q => q.Id == idQuestion).FirstOrDefault());
+                        }
                     }
                     else
                     {
-                        //gets answer type, creates new question
-                        string type;
-                        string answerType = atts.Where(a => a.Name.ToLower() == "type").FirstOrDefault().Value;
-                        if (answerType == "checkbox") type = "multiple_answers_question";
-                        else type = "multiple_choice_question";
-                        tp.CurrentQuestions.Add(new Question()
+                        if (tp.CurrentQuestions.Any(q => q.Id == idQuestion))
                         {
-                            Id = idQuestion,
-                            Type = type,
-                            Answers = { Tuple.Create(answerId, string.Empty) }
-                        });
+                            tp.CurrentQuestions
+                                .Where(q => q.Id == idQuestion)
+                                .FirstOrDefault()
+                                .Answers.Add(Tuple.Create(answerId, string.Empty));
+                        }
+                        else
+                        {
+                            //gets answer type, creates new question
+                            string type;
+                            string answerType = atts.Where(a => a.Name.ToLower() == "type").FirstOrDefault().Value;
+                            if (answerType == "checkbox") type = "multiple_answers_question";
+                            else type = "multiple_choice_question";
+                            tp.CurrentQuestions.Add(new Question()
+                            {
+                                Id = idQuestion,
+                                Type = type,
+                                Answers = { Tuple.Create(answerId, string.Empty) }
+                            });
+                        }
                     }
                 }
             }
@@ -306,5 +328,18 @@ namespace AutoTPs
                 q.FullyLoaded = true;
             }
         }
+
+        private static bool isAlertPresent()
+        {
+            try
+            {
+                Driver.GetInstance.WebDrive.SwitchTo().Alert();
+                return true;
+            }   // try 
+            catch (NoAlertPresentException Ex)
+            {
+                return false;
+            }   // catch 
+        }   // isAlertPresent()
     }
 }
