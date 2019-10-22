@@ -2,9 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using HtmlAgilityPack;
-using OpenQA.Selenium;
 using ScrapySharp.Extensions;
 
 namespace AutoTPs
@@ -63,7 +61,7 @@ namespace AutoTPs
                         Question unresolvedQ = tp.CurrentQuestions.Where(q => q.Resolved == false).FirstOrDefault();
 
                         //select an answer
-                        Tuple<string, string> answerSelected = unresolvedQ.Answers.FirstOrDefault();
+                        Tuple<string, string> answerSelected = new Tuple<string, string>("","");
                         if (unresolvedQ.Answers.Count == 0)
                         {
                             if(unresolvedQ.Type == "multiple_answers_question")
@@ -80,6 +78,7 @@ namespace AutoTPs
                         }
                         else
                         {
+                            answerSelected = unresolvedQ.Answers.FirstOrDefault();
                             if (unresolvedQ.Type == "multiple_choice_question") Methods.Click(answerSelected.Item1, "Id");
                             else
                             {
@@ -90,24 +89,13 @@ namespace AutoTPs
                                 else Methods.Click(answerSelected.Item1, "Id");
                             }
                         }
-                        if(tp.LastMark > 70)
-                        {
-                            HtmlDocument page = new HtmlDocument();
-                            page.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
-                            page.Save($"{tp.CurrentExpectedMark}.html");
-                        }
 
                         //submit
                         Methods.Click("submit_quiz_button", "Id");
 
-                        //take a breath
-                        //Task.Delay(1000);
-
                         //check if exist an alert of incomplete answers and accept it
-                        if (isAlertPresent()) Driver.GetInstance.WebDrive.SwitchTo().Alert().Accept();
-
-                        //take a breath
-                        //Task.Delay(1000);
+                        if(tp.CurrentExpectedMark < 95) Driver.GetInstance.WebDrive.SwitchTo().Alert().Accept();
+                        //if (isAlertPresent()) Driver.GetInstance.WebDrive.SwitchTo().Alert().Accept();
 
                         //scarp results page
                         HtmlDocument doc = new HtmlDocument();
@@ -132,14 +120,12 @@ namespace AutoTPs
                                     {
                                         unresolvedQ.CorrectAnswers.Add(unresolvedQ.Answers.FirstOrDefault());
                                         unresolvedQ.Resolved = true;
-                                        Console.WriteLine($"Total of Q / Resolved: {tp.Questions.Count()}/{tp.Questions.Where(q => q.Resolved == true).Count()}");
-                            }
+                                    }
                                     break;
                                 case 5:
                                     unresolvedQ.CorrectAnswers.Add(answerSelected);
                                     unresolvedQ.Answers.Remove(answerSelected);
                                     unresolvedQ.Resolved = true;
-                                    Console.WriteLine($"Total of Q / Resolved: {tp.Questions.Count()}/{tp.Questions.Where(q => q.Resolved == true).Count()}");
                                     break;
                                 default:
                                     unresolvedQ.CorrectAnswers.Add(answerSelected);
@@ -165,6 +151,7 @@ namespace AutoTPs
                         {
                             unresolvedQ.Resolved = true;
                         }
+                        Console.WriteLine($"Total of Q / Resolved: {tp.Questions.Count()}/{tp.Questions.Where(q => q.Resolved == true).Count()}");
                     }
                 }
             }
@@ -329,7 +316,7 @@ namespace AutoTPs
             }
         }
 
-        private static bool isAlertPresent()
+        /*private static bool isAlertPresent()
         {
             try
             {
@@ -340,6 +327,6 @@ namespace AutoTPs
             {
                 return false;
             }   // catch 
-        }   // isAlertPresent()
+        }   // isAlertPresent()*/
     }
 }
