@@ -81,33 +81,36 @@ namespace AutoTPs
                         }
 
                         //select an answer
-                        Tuple<string, string> answerSelected = new Tuple<string, string>("","");
-                        if (unresolvedQ.Answers.Count == 0)
+                        Tuple<string, string> answerSelected = new Tuple<string, string>("", "");
+                        if (unresolvedQ != null)
                         {
-                            if(unresolvedQ.Type == "multiple_answers_question" 
-                                || unresolvedQ.Type == "multiple_choice_question")
+                            if (unresolvedQ.Answers.Count == 0)
                             {
-                                foreach(Tuple<string, string> a in unresolvedQ.CorrectAnswers) Methods.Click(a.Item1, "Id");
+                                if (unresolvedQ.Type == "multiple_answers_question"
+                                    || unresolvedQ.Type == "multiple_choice_question")
+                                {
+                                    foreach (Tuple<string, string> a in unresolvedQ.CorrectAnswers) Methods.Click(a.Item1, "Id");
+                                }
+                                else
+                                {
+                                    foreach (Tuple<string, string> a in unresolvedQ.CorrectAnswers)
+                                    {
+                                        Methods.SelectDropDown(a.Item1, "Id", a.Item2);
+                                    }
+                                }
                             }
                             else
                             {
-                                foreach (Tuple<string, string> a in unresolvedQ.CorrectAnswers)
+                                answerSelected = unresolvedQ.Answers.FirstOrDefault();
+                                if (unresolvedQ.Type == "multiple_choice_question") Methods.Click(answerSelected.Item1, "Id");
+                                else
                                 {
-                                    Methods.SelectDropDown(a.Item1, "Id", a.Item2);
+                                    if (unresolvedQ.Type == "matching_question")
+                                    {
+                                        Methods.SelectDropDown(answerSelected.Item1, "Id", answerSelected.Item2);
+                                    }
+                                    else Methods.Click(answerSelected.Item1, "Id");
                                 }
-                            }
-                        }
-                        else
-                        {
-                            answerSelected = unresolvedQ.Answers.FirstOrDefault();
-                            if (unresolvedQ.Type == "multiple_choice_question") Methods.Click(answerSelected.Item1, "Id");
-                            else
-                            {
-                                if (unresolvedQ.Type == "matching_question")
-                                {
-                                    Methods.SelectDropDown(answerSelected.Item1, "Id", answerSelected.Item2);
-                                }
-                                else Methods.Click(answerSelected.Item1, "Id");
                             }
                         }
 
@@ -122,7 +125,7 @@ namespace AutoTPs
                         Console.WriteLine($"Mark: {tp.LastMark}");
 
                         //verify answer
-                        if (answerSelected != null)
+                        if (!string.IsNullOrEmpty(answerSelected.Item1))
                         {
                             switch (tp.LastMark - tp.CurrentExpectedMark)
                             {
@@ -130,7 +133,8 @@ namespace AutoTPs
                                     unresolvedQ.Answers.Remove(answerSelected);
                                     if(unresolvedQ.Answers.Count == 1)
                                     {
-                                        unresolvedQ.CorrectAnswers.Add(unresolvedQ.Answers.FirstOrDefault());
+                                        Tuple<string, string> answer = unresolvedQ.Answers.FirstOrDefault();
+                                        if(!string.IsNullOrEmpty(answer.Item1)) unresolvedQ.CorrectAnswers.Add(answer);
                                         unresolvedQ.Resolved = true;
                                     }
                                     break;
@@ -163,6 +167,10 @@ namespace AutoTPs
                         else
                         {
                             unresolvedQ.Resolved = true;
+                        }
+                        foreach(Tuple<string,string> ct in unresolvedQ.CorrectAnswers)
+                        {
+                            if (string.IsNullOrEmpty(ct.Item1)) Console.WriteLine("FUCK empty correct answer");
                         }
                         Console.WriteLine($"Total of Q / Resolved: {tp.Questions.Count()}/{tp.Questions.Where(q => q.Resolved == true).Count()}");
                     }
