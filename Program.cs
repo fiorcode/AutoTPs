@@ -23,8 +23,8 @@ namespace AutoTPs
                 foreach(string t in tpLinks)
                 {
                     Driver.GetInstance.WebDrive.Navigate().GoToUrl($"{baseUrl}{t}");
+                    if (GetLastMark() > 90) continue;
                     TP tp = new TP();
-
                     while (tp.LastMark < 100)
                     {
                         //clear current questions list and initialize expected mark
@@ -46,10 +46,24 @@ namespace AutoTPs
                                 {
                                     foreach (Tuple<string, string> ans in q.CorrectAnswers)
                                     {
-                                        Methods.SelectDropDown(ans.Item1, "Id", ans.Item2);
+                                        if(!string.IsNullOrEmpty(ans.Item1) && !string.IsNullOrEmpty(ans.Item2))
+                                        {
+                                            Methods.SelectDropDown(ans.Item1, "Id", ans.Item2);
+                                        }
                                     }
                                 }
-                                else foreach (Tuple<string, string> ans in q.CorrectAnswers) Methods.Click(ans.Item1, "Id");
+                                else
+                                {
+                                    foreach (Tuple<string, string> ans in q.CorrectAnswers)
+                                    {
+                                        if (string.IsNullOrEmpty(ans.Item1))
+                                        {
+                                            Console.WriteLine("Ups");
+                                            Console.ReadKey();
+                                        }
+                                        else Methods.Click(ans.Item1, "Id");
+                                    }
+                                }
                                 tp.CurrentExpectedMark += 5;
                             }
                         }
@@ -60,11 +74,18 @@ namespace AutoTPs
                         //select an unresolved question
                         Question unresolvedQ = tp.CurrentQuestions.Where(q => q.Resolved == false).FirstOrDefault();
 
+                        if(tp.CurrentExpectedMark > 90)
+                        {
+                            Console.WriteLine($"You can print to pdf this mark: {tp.CurrentExpectedMark}");
+                            Console.ReadKey();
+                        }
+
                         //select an answer
                         Tuple<string, string> answerSelected = new Tuple<string, string>("","");
                         if (unresolvedQ.Answers.Count == 0)
                         {
-                            if(unresolvedQ.Type == "multiple_answers_question")
+                            if(unresolvedQ.Type == "multiple_answers_question" 
+                                || unresolvedQ.Type == "multiple_choice_question")
                             {
                                 foreach(Tuple<string, string> a in unresolvedQ.CorrectAnswers) Methods.Click(a.Item1, "Id");
                             }
@@ -95,18 +116,9 @@ namespace AutoTPs
 
                         //check if exist an alert of incomplete answers and accept it
                         if(tp.CurrentExpectedMark < 95) Driver.GetInstance.WebDrive.SwitchTo().Alert().Accept();
-                        //if (isAlertPresent()) Driver.GetInstance.WebDrive.SwitchTo().Alert().Accept();
-
-                        //scarp results page
-                        HtmlDocument doc = new HtmlDocument();
-                        doc.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
 
                         //save mark
-                        tp.LastMark = Convert.ToDouble(doc
-                            .DocumentNode
-                            .CssSelect(".score_value")
-                            .FirstOrDefault()
-                            .InnerHtml);
+                        tp.LastMark = GetLastMark();
                         Console.WriteLine($"Mark: {tp.LastMark}");
 
                         //verify answer
@@ -144,6 +156,7 @@ namespace AutoTPs
                                         }
                                     }
                                     else unresolvedQ.Answers.Remove(answerSelected);
+                                    if (unresolvedQ.CorrectAnswers.Count()*(tp.LastMark - tp.CurrentExpectedMark) == 5) unresolvedQ.Resolved = true;
                                     break;
                             }
                         }
@@ -313,6 +326,25 @@ namespace AutoTPs
             {
                 if(!q.FullyLoaded) tp.Questions.Add(q);
                 q.FullyLoaded = true;
+            }
+        }
+
+        private static double GetLastMark()
+        {
+            try
+            {
+                //scarp results page
+                HtmlDocument doc = new HtmlDocument();
+                doc.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
+
+                //return mark
+                return Convert.ToDouble(doc.DocumentNode.CssSelect(".score_value").FirstOrDefault().InnerHtml);
+            }
+            catch(Exception e)
+            {
+                Console.WriteLine(e.Message);
+                Console.WriteLine("First try");
+                return 0;
             }
         }
 
