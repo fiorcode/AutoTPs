@@ -125,6 +125,7 @@ namespace AutoTPs
                         Console.WriteLine($"Mark: {tp.LastMark}");
 
                         //verify answer
+                        //TODO: verify if there is no answer to resolve
                         if (!string.IsNullOrEmpty(answerSelected.Item1))
                         {
                             switch (tp.LastMark - tp.CurrentExpectedMark)
