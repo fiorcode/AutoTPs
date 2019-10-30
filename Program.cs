@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
+using OpenQA.Selenium;
 using ScrapySharp.Extensions;
 
 namespace AutoTPs
@@ -23,7 +24,7 @@ namespace AutoTPs
                 foreach(string t in tpLinks)
                 {
                     Driver.GetInstance.WebDrive.Navigate().GoToUrl($"{baseUrl}{t}");
-                    if (GetLastMark() > 90) continue;
+                    //if (GetLastMark() > 90) continue;
                     TP tp = new TP();
                     while (tp.LastMark < 100)
                     {
@@ -76,7 +77,7 @@ namespace AutoTPs
 
                         if(tp.CurrentExpectedMark > 90)
                         {
-                            Console.WriteLine($"You can print to pdf this mark: {tp.CurrentExpectedMark}");
+                            Console.WriteLine($"You can print to pdf this expected mark");
                             Console.ReadKey();
                         }
 
@@ -118,7 +119,7 @@ namespace AutoTPs
                         Methods.Click("submit_quiz_button", "Id");
 
                         //check if exist an alert of incomplete answers and accept it
-                        if(tp.CurrentExpectedMark < 95) Driver.GetInstance.WebDrive.SwitchTo().Alert().Accept();
+                        if(isAlertPresent()) Driver.GetInstance.WebDrive.SwitchTo().Alert().Accept();
 
                         //save mark
                         tp.LastMark = GetLastMark();
@@ -161,7 +162,8 @@ namespace AutoTPs
                                         }
                                     }
                                     else unresolvedQ.Answers.Remove(answerSelected);
-                                    if (unresolvedQ.CorrectAnswers.Count()*(tp.LastMark - tp.CurrentExpectedMark) == 5) unresolvedQ.Resolved = true;
+                                    double score = unresolvedQ.CorrectAnswers.Count() * (tp.LastMark - tp.CurrentExpectedMark);
+                                    if (score == 5) unresolvedQ.Resolved = true;
                                     break;
                             }
                         }
@@ -169,11 +171,11 @@ namespace AutoTPs
                         {
                             unresolvedQ.Resolved = true;
                         }
-                        foreach(Tuple<string,string> ct in unresolvedQ.CorrectAnswers)
+                        /*foreach(Tuple<string,string> ct in unresolvedQ.CorrectAnswers)
                         {
                             if (string.IsNullOrEmpty(ct.Item1)) Console.WriteLine("FUCK empty correct answer");
-                        }
-                        Console.WriteLine($"Total of Q / Resolved: {tp.Questions.Count()}/{tp.Questions.Where(q => q.Resolved == true).Count()}");
+                        }*/
+                        Console.WriteLine($"Total of Q / Resolved: {tp.Questions.Count()}/{tp.Questions.Where(q => q.Resolved == true).Count()}\n");
                     }
                 }
             }
@@ -223,13 +225,14 @@ namespace AutoTPs
             //scrap TP page
             HtmlDocument doc = new HtmlDocument();
             doc.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
-            //go for each select answer
+
+            //go for each matching type answer
             HtmlNodeCollection selectNodes = doc.DocumentNode.SelectNodes("//select[@id]");
             if(selectNodes != null)
             {
-                foreach (var Node in doc.DocumentNode.SelectNodes("//select[@id]"))
+                foreach (var Node in selectNodes)
                 {
-                    //load answer <input> attributes
+                    //load answer <select> attributes
                     HtmlAttributeCollection atts = Node.Attributes;
                     //gets answer id
                     string answerId = atts.Where(a => a.Name.ToLower() == "id").FirstOrDefault().Value;
@@ -284,7 +287,8 @@ namespace AutoTPs
                     }
                 }
             }
-            //go for each input answer
+
+            //go for each input type answer
             HtmlNodeCollection inputNodes = doc.DocumentNode.SelectNodes("//input[@id]");
             if(inputNodes != null)
             {
@@ -349,25 +353,24 @@ namespace AutoTPs
                 //return mark
                 return Convert.ToDouble(doc.DocumentNode.CssSelect(".score_value").FirstOrDefault().InnerHtml);
             }
-            catch(Exception e)
+            catch
             {
-                Console.WriteLine(e.Message);
                 Console.WriteLine("First try");
                 return 0;
             }
         }
 
-        /*private static bool isAlertPresent()
+        private static bool isAlertPresent()
         {
             try
             {
                 Driver.GetInstance.WebDrive.SwitchTo().Alert();
                 return true;
-            }   // try 
+            }
             catch (NoAlertPresentException Ex)
             {
                 return false;
-            }   // catch 
-        }   // isAlertPresent()*/
+            }
+        }
     }
 }
