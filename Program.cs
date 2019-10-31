@@ -27,7 +27,6 @@ namespace AutoTPs
                     Console.WriteLine("Skip this TP? y/n");
                     char keyEnter = Console.ReadKey().KeyChar;
                     if (keyEnter == 'y') continue;
-                    //if (GetLastMark() > 90) continue;
                     TP tp = new TP();
                     while (tp.LastMark < 100)
                     {
@@ -169,7 +168,7 @@ namespace AutoTPs
                                         }
                                         else unresolvedQ.Answers.Remove(answerSelected);
                                         double score = unresolvedQ.CorrectAnswers.Count() * (tp.LastMark - tp.CurrentExpectedMark);
-                                        if (score == 5) unresolvedQ.Resolved = true;
+                                        if (Math.Truncate(score) == 5) unresolvedQ.Resolved = true;
                                         break;
                                 }
                             }
