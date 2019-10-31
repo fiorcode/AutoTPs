@@ -9,6 +9,7 @@ namespace AutoTPs
         {
             FullyLoaded = false;
             Resolved = false;
+            Printed = false;
             Answers = new List<Tuple<string, string>>();
             CorrectAnswers = new List<Tuple<string, string>>();
         }
@@ -18,6 +19,8 @@ namespace AutoTPs
         public string Type { get; set; }
 
         public bool FullyLoaded { get; set; }
+
+        public bool Printed { get; set; }
 
         public bool Resolved { get; set; }
         
