@@ -24,6 +24,9 @@ namespace AutoTPs
                 foreach(string t in tpLinks)
                 {
                     Driver.GetInstance.WebDrive.Navigate().GoToUrl($"{baseUrl}{t}");
+                    Console.WriteLine("Skip this TP? y/n");
+                    char keyEnter = Console.ReadKey().KeyChar;
+                    if (keyEnter == 'y') continue;
                     //if (GetLastMark() > 90) continue;
                     TP tp = new TP();
                     while (tp.LastMark < 100)
@@ -65,6 +68,7 @@ namespace AutoTPs
                                         else Methods.Click(ans.Item1, "Id");
                                     }
                                 }
+                                if (!q.Printed) TakeScreenshot(q);
                                 tp.CurrentExpectedMark += 5;
                             }
                         }
@@ -126,56 +130,55 @@ namespace AutoTPs
                         Console.WriteLine($"Mark: {tp.LastMark}");
 
                         //verify answer
-                        //TODO: verify if there is no answer to resolve
-                        if (!string.IsNullOrEmpty(answerSelected.Item1))
+                        //TODO: verify if there is no question to resolve
+                        if(unresolvedQ != null)
                         {
-                            switch (tp.LastMark - tp.CurrentExpectedMark)
+                            if (!string.IsNullOrEmpty(answerSelected.Item1))
                             {
-                                case 0:
-                                    unresolvedQ.Answers.Remove(answerSelected);
-                                    if(unresolvedQ.Answers.Count == 1)
-                                    {
-                                        Tuple<string, string> answer = unresolvedQ.Answers.FirstOrDefault();
-                                        if(!string.IsNullOrEmpty(answer.Item1)) unresolvedQ.CorrectAnswers.Add(answer);
+                                switch (tp.LastMark - tp.CurrentExpectedMark)
+                                {
+                                    case 0:
+                                        unresolvedQ.Answers.Remove(answerSelected);
+                                        if (unresolvedQ.Answers.Count == 1)
+                                        {
+                                            Tuple<string, string> answer = unresolvedQ.Answers.FirstOrDefault();
+                                            if (!string.IsNullOrEmpty(answer.Item1)) unresolvedQ.CorrectAnswers.Add(answer);
+                                            unresolvedQ.Resolved = true;
+                                        }
+                                        break;
+                                    case 5:
+                                        unresolvedQ.CorrectAnswers.Add(answerSelected);
+                                        unresolvedQ.Answers.Remove(answerSelected);
                                         unresolvedQ.Resolved = true;
-                                    }
-                                    break;
-                                case 5:
-                                    unresolvedQ.CorrectAnswers.Add(answerSelected);
-                                    unresolvedQ.Answers.Remove(answerSelected);
-                                    unresolvedQ.Resolved = true;
-                                    break;
-                                default:
-                                    unresolvedQ.CorrectAnswers.Add(answerSelected);
-                                    if (unresolvedQ.Type == "matching_question")
-                                    {
-                                        List<Tuple<string, string>> toRemove = new List<Tuple<string, string>>();
-                                        foreach (Tuple<string, string> ans in unresolvedQ.Answers.Where(
-                                            a => a.Item1 == answerSelected.Item1 ||
-                                            a.Item2 == answerSelected.Item2))
+                                        break;
+                                    default:
+                                        unresolvedQ.CorrectAnswers.Add(answerSelected);
+                                        if (unresolvedQ.Type == "matching_question")
                                         {
-                                            toRemove.Add(ans);
+                                            List<Tuple<string, string>> toRemove = new List<Tuple<string, string>>();
+                                            foreach (Tuple<string, string> ans in unresolvedQ.Answers.Where(
+                                                a => a.Item1 == answerSelected.Item1 ||
+                                                a.Item2 == answerSelected.Item2))
+                                            {
+                                                toRemove.Add(ans);
+                                            }
+                                            foreach (Tuple<string, string> tuple in toRemove)
+                                            {
+                                                unresolvedQ.Answers.Remove(tuple);
+                                            }
                                         }
-                                        foreach (Tuple<string, string> tuple in toRemove)
-                                        {
-                                            unresolvedQ.Answers.Remove(tuple);
-                                        }
-                                    }
-                                    else unresolvedQ.Answers.Remove(answerSelected);
-                                    double score = unresolvedQ.CorrectAnswers.Count() * (tp.LastMark - tp.CurrentExpectedMark);
-                                    if (score == 5) unresolvedQ.Resolved = true;
-                                    break;
+                                        else unresolvedQ.Answers.Remove(answerSelected);
+                                        double score = unresolvedQ.CorrectAnswers.Count() * (tp.LastMark - tp.CurrentExpectedMark);
+                                        if (score == 5) unresolvedQ.Resolved = true;
+                                        break;
+                                }
+                            }
+                            else
+                            {
+                                unresolvedQ.Resolved = true;
                             }
                         }
-                        else
-                        {
-                            unresolvedQ.Resolved = true;
-                        }
-                        /*foreach(Tuple<string,string> ct in unresolvedQ.CorrectAnswers)
-                        {
-                            if (string.IsNullOrEmpty(ct.Item1)) Console.WriteLine("FUCK empty correct answer");
-                        }*/
-                        Console.WriteLine($"Total of Q / Resolved: {tp.Questions.Count()}/{tp.Questions.Where(q => q.Resolved == true).Count()}\n");
+                        Console.WriteLine($"Total/Resolved: {tp.Questions.Count()}/{tp.Questions.Where(q => q.Resolved == true).Count()}\n");
                     }
                 }
             }
@@ -370,6 +373,21 @@ namespace AutoTPs
             catch (NoAlertPresentException Ex)
             {
                 return false;
+            }
+        }
+
+        private static void TakeScreenshot(Question question)
+        {
+            try
+            {
+                Screenshot ss = ((ITakesScreenshot)Driver.GetInstance.WebDrive).GetScreenshot();
+                ss.SaveAsFile($"{question.Id}.jpg");
+                question.Printed = true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+                throw;
             }
         }
     }
