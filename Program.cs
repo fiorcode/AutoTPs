@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using HtmlAgilityPack;
 using OpenQA.Selenium;
 using ScrapySharp.Extensions;
@@ -33,6 +34,8 @@ namespace AutoTPs
                         //clear current questions list and initialize expected mark
                         tp.CurrentQuestions.Clear();
                         tp.CurrentExpectedMark = 0;
+
+                        Task.Delay(500);
 
                         //take it
                         Methods.Click("take_quiz_link", "Id");
@@ -117,6 +120,8 @@ namespace AutoTPs
                                 }
                             }
                         }
+
+                        Task.Delay(1500);
 
                         //submit
                         Methods.Click("submit_quiz_button", "Id");
