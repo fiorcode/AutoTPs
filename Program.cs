@@ -193,7 +193,7 @@ namespace AutoTPs
         {
             Driver.GetInstance.WebDrive.Navigate().GoToUrl(loginUrl);
             Methods.EnterText("pseudonym_session[unique_id]", "lperez23", "Name");
-            Methods.EnterText("pseudonym_session[password]", "fumigaRola70.", "Name");
+            Methods.EnterText("pseudonym_session[password]", "pinZaenchuFe46.", "Name");
             Methods.Click("Button--login", "ClassName");
         }
 
