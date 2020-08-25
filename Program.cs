@@ -20,6 +20,8 @@ namespace AutoTPs
             
             foreach(string c in Courses)
             {
+                if (c == "/courses/7662") continue;
+                if (c == "/courses/9674") continue;
                 Driver.GetInstance.WebDrive.Navigate().GoToUrl($"{baseUrl}{c}");
                 List<string> tpLinks = GetTPLinks();
                 foreach(string t in tpLinks)
