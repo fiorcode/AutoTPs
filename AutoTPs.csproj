@@ -11,7 +11,7 @@
     <PackageReference Include="ScrapySharp" Version="3.0.0" />
     <PackageReference Include="Selenium.Support" Version="3.141.0" />
     <PackageReference Include="Selenium.WebDriver" Version="3.141.0" />
-    <PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="83.0.4103.3915" />
+    <PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="85.0.4183.8300" />
     <PackageReference Include="WebDriverChromeDriver" Version="2.10.0" />
   </ItemGroup>
 
