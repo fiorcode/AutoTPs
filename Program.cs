@@ -14,189 +14,203 @@ namespace AutoTPs
         private static string baseUrl = "https://siglo21.instructure.com";
         static void Main(string[] args)
         {
-            DoLogin(baseUrl);
-
-            List<string> Courses = GetCourses();
-            
-            foreach(string c in Courses)
+            try
             {
-                if (c == "/courses/7662") continue;
-                if (c == "/courses/9674") continue;
-                Driver.GetInstance.WebDrive.Navigate().GoToUrl($"{baseUrl}{c}");
-                List<string> tpLinks = GetTPLinks();
-                foreach(string t in tpLinks)
+                DoLogin(baseUrl);
+
+                List<string> Courses = GetCourses();
+
+                foreach (string c in Courses)
                 {
-                    Driver.GetInstance.WebDrive.Navigate().GoToUrl($"{baseUrl}{t}");
-                    Console.WriteLine("Skip this TP? y/n");
-                    char keyEnter = Console.ReadKey().KeyChar;
-                    if (keyEnter == 'y') continue;
-                    TP tp = new TP();
-                    while (tp.LastMark < 100)
+                    if (c == "/courses/7662") continue;
+                    if (c == "/courses/9674") continue;
+                    Driver.GetInstance.WebDrive.Navigate().GoToUrl($"{baseUrl}{c}");
+                    List<string> tpLinks = GetTPLinks();
+                    foreach (string t in tpLinks)
                     {
-                        //clear current questions list and initialize expected mark
-                        tp.CurrentQuestions.Clear();
-                        tp.CurrentExpectedMark = 0;
-
-                        Task.Delay(500);
-
-                        //take it
-                        Methods.Click("take_quiz_link", "Id");
-
-                        //load questions
-                        LoadQuestions(tp);
-
-                        //complete with resolved questions
-                        foreach (Question q in tp.CurrentQuestions)
+                        Driver.GetInstance.WebDrive.Navigate().GoToUrl($"{baseUrl}{t}");
+                        Console.WriteLine("Skip this TP? y/n");
+                        char keyEnter = Console.ReadKey().KeyChar;
+                        if (keyEnter == 'y') continue;
+                        TP tp = new TP();
+                        while (tp.LastMark < 100)
                         {
-                            if (q.Resolved == true)
+                            //clear current questions list and initialize expected mark
+                            tp.CurrentQuestions.Clear();
+                            tp.CurrentExpectedMark = 0;
+
+                            Task.Delay(500);
+
+                            //take it
+                            Methods.Click("take_quiz_link", "Id");
+
+                            //load questions
+                            LoadQuestions(tp);
+
+                            //complete with resolved questions
+                            foreach (Question q in tp.CurrentQuestions)
                             {
-                                if (q.Type == "matching_question")
+                                if (q.Resolved == true)
                                 {
-                                    foreach (Tuple<string, string> ans in q.CorrectAnswers)
+                                    if (q.Type == "matching_question")
                                     {
-                                        if(!string.IsNullOrEmpty(ans.Item1) && !string.IsNullOrEmpty(ans.Item2))
+                                        foreach (Tuple<string, string> ans in q.CorrectAnswers)
                                         {
-                                            Methods.SelectDropDown(ans.Item1, "Id", ans.Item2);
+                                            if (!string.IsNullOrEmpty(ans.Item1) && !string.IsNullOrEmpty(ans.Item2))
+                                            {
+                                                Methods.SelectDropDown(ans.Item1, "Id", ans.Item2);
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        foreach (Tuple<string, string> ans in q.CorrectAnswers)
+                                        {
+                                            if (string.IsNullOrEmpty(ans.Item1))
+                                            {
+                                                Console.WriteLine("Ups");
+                                                Console.ReadKey();
+                                            }
+                                            else Methods.Click(ans.Item1, "Id");
+                                        }
+                                    }
+                                    if (!q.Printed) TakeScreenshot(q);
+                                    tp.CurrentExpectedMark += 5;
+                                }
+                            }
+
+                            //print the expected minimum mark
+                            Console.WriteLine($"Minimum expected mark: {tp.CurrentExpectedMark}");
+
+                            //select an unresolved question
+                            Question unresolvedQ = tp.CurrentQuestions.Where(q => q.Resolved == false).FirstOrDefault();
+
+                            if (tp.CurrentExpectedMark > 90)
+                            {
+                                Console.WriteLine($"You can print to pdf this expected mark");
+                                Console.ReadKey();
+                            }
+
+                            //select an answer
+                            Tuple<string, string> answerSelected = new Tuple<string, string>("", "");
+                            if (unresolvedQ != null)
+                            {
+                                if (unresolvedQ.Answers.Count == 0)
+                                {
+                                    if (unresolvedQ.Type == "multiple_answers_question"
+                                        || unresolvedQ.Type == "multiple_choice_question")
+                                    {
+                                        foreach (Tuple<string, string> a in unresolvedQ.CorrectAnswers) Methods.Click(a.Item1, "Id");
+                                    }
+                                    else
+                                    {
+                                        foreach (Tuple<string, string> a in unresolvedQ.CorrectAnswers)
+                                        {
+                                            Methods.SelectDropDown(a.Item1, "Id", a.Item2);
                                         }
                                     }
                                 }
                                 else
                                 {
-                                    foreach (Tuple<string, string> ans in q.CorrectAnswers)
+                                    answerSelected = unresolvedQ.Answers.FirstOrDefault();
+                                    if (unresolvedQ.Type == "multiple_choice_question") Methods.Click(answerSelected.Item1, "Id");
+                                    else
                                     {
-                                        if (string.IsNullOrEmpty(ans.Item1))
-                                        {
-                                            Console.WriteLine("Ups");
-                                            Console.ReadKey();
-                                        }
-                                        else Methods.Click(ans.Item1, "Id");
-                                    }
-                                }
-                                if (!q.Printed) TakeScreenshot(q);
-                                tp.CurrentExpectedMark += 5;
-                            }
-                        }
-
-                        //print the expected minimum mark
-                        Console.WriteLine($"Minimum expected mark: {tp.CurrentExpectedMark}");
-
-                        //select an unresolved question
-                        Question unresolvedQ = tp.CurrentQuestions.Where(q => q.Resolved == false).FirstOrDefault();
-
-                        if(tp.CurrentExpectedMark > 90)
-                        {
-                            Console.WriteLine($"You can print to pdf this expected mark");
-                            Console.ReadKey();
-                        }
-
-                        //select an answer
-                        Tuple<string, string> answerSelected = new Tuple<string, string>("", "");
-                        if (unresolvedQ != null)
-                        {
-                            if (unresolvedQ.Answers.Count == 0)
-                            {
-                                if (unresolvedQ.Type == "multiple_answers_question"
-                                    || unresolvedQ.Type == "multiple_choice_question")
-                                {
-                                    foreach (Tuple<string, string> a in unresolvedQ.CorrectAnswers) Methods.Click(a.Item1, "Id");
-                                }
-                                else
-                                {
-                                    foreach (Tuple<string, string> a in unresolvedQ.CorrectAnswers)
-                                    {
-                                        Methods.SelectDropDown(a.Item1, "Id", a.Item2);
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                answerSelected = unresolvedQ.Answers.FirstOrDefault();
-                                if (unresolvedQ.Type == "multiple_choice_question") Methods.Click(answerSelected.Item1, "Id");
-                                else
-                                {
-                                    if (unresolvedQ.Type == "matching_question")
-                                    {
-                                        Methods.SelectDropDown(answerSelected.Item1, "Id", answerSelected.Item2);
-                                    }
-                                    else Methods.Click(answerSelected.Item1, "Id");
-                                }
-                            }
-                        }
-
-                        Task.Delay(1500);
-
-                        //submit
-                        Methods.Click("submit_quiz_button", "Id");
-
-                        //check if exist an alert of incomplete answers and accept it
-                        if(isAlertPresent()) Driver.GetInstance.WebDrive.SwitchTo().Alert().Accept();
-
-                        //save mark
-                        tp.LastMark = GetLastMark();
-                        Console.WriteLine($"Mark: {tp.LastMark}");
-
-                        //verify answer
-                        //TODO: verify if there is no question to resolve
-                        if(unresolvedQ != null)
-                        {
-                            if (!string.IsNullOrEmpty(answerSelected.Item1))
-                            {
-                                switch (tp.LastMark - tp.CurrentExpectedMark)
-                                {
-                                    case 0:
-                                        unresolvedQ.Answers.Remove(answerSelected);
-                                        if (unresolvedQ.Answers.Count == 1)
-                                        {
-                                            Tuple<string, string> answer = unresolvedQ.Answers.FirstOrDefault();
-                                            if (!string.IsNullOrEmpty(answer.Item1)) unresolvedQ.CorrectAnswers.Add(answer);
-                                            unresolvedQ.Resolved = true;
-                                        }
-                                        break;
-                                    case 5:
-                                        unresolvedQ.CorrectAnswers.Add(answerSelected);
-                                        unresolvedQ.Answers.Remove(answerSelected);
-                                        unresolvedQ.Resolved = true;
-                                        break;
-                                    default:
-                                        unresolvedQ.CorrectAnswers.Add(answerSelected);
                                         if (unresolvedQ.Type == "matching_question")
                                         {
-                                            List<Tuple<string, string>> toRemove = new List<Tuple<string, string>>();
-                                            foreach (Tuple<string, string> ans in unresolvedQ.Answers.Where(
-                                                a => a.Item1 == answerSelected.Item1 ||
-                                                a.Item2 == answerSelected.Item2))
-                                            {
-                                                toRemove.Add(ans);
-                                            }
-                                            foreach (Tuple<string, string> tuple in toRemove)
-                                            {
-                                                unresolvedQ.Answers.Remove(tuple);
-                                            }
+                                            Methods.SelectDropDown(answerSelected.Item1, "Id", answerSelected.Item2);
                                         }
-                                        else unresolvedQ.Answers.Remove(answerSelected);
-                                        double score = unresolvedQ.CorrectAnswers.Count() * (tp.LastMark - tp.CurrentExpectedMark);
-                                        if (Math.Truncate(score) == 5) unresolvedQ.Resolved = true;
-                                        break;
+                                        else Methods.Click(answerSelected.Item1, "Id");
+                                    }
                                 }
                             }
-                            else
+
+                            Task.Delay(1500);
+
+                            //submit
+                            Methods.Click("submit_quiz_button", "Id");
+
+                            //check if exist an alert of incomplete answers and accept it
+                            if (isAlertPresent()) Driver.GetInstance.WebDrive.SwitchTo().Alert().Accept();
+
+                            //save mark
+                            tp.LastMark = GetLastMark();
+                            Console.WriteLine($"Mark: {tp.LastMark}");
+
+                            //verify answer
+                            //TODO: verify if there is no question to resolve
+                            if (unresolvedQ != null)
                             {
-                                unresolvedQ.Resolved = true;
+                                if (!string.IsNullOrEmpty(answerSelected.Item1))
+                                {
+                                    switch (tp.LastMark - tp.CurrentExpectedMark)
+                                    {
+                                        case 0:
+                                            unresolvedQ.Answers.Remove(answerSelected);
+                                            if (unresolvedQ.Answers.Count == 1)
+                                            {
+                                                Tuple<string, string> answer = unresolvedQ.Answers.FirstOrDefault();
+                                                if (!string.IsNullOrEmpty(answer.Item1)) unresolvedQ.CorrectAnswers.Add(answer);
+                                                unresolvedQ.Resolved = true;
+                                            }
+                                            break;
+                                        case 5:
+                                            unresolvedQ.CorrectAnswers.Add(answerSelected);
+                                            unresolvedQ.Answers.Remove(answerSelected);
+                                            unresolvedQ.Resolved = true;
+                                            break;
+                                        default:
+                                            unresolvedQ.CorrectAnswers.Add(answerSelected);
+                                            if (unresolvedQ.Type == "matching_question")
+                                            {
+                                                List<Tuple<string, string>> toRemove = new List<Tuple<string, string>>();
+                                                foreach (Tuple<string, string> ans in unresolvedQ.Answers.Where(
+                                                    a => a.Item1 == answerSelected.Item1 ||
+                                                    a.Item2 == answerSelected.Item2))
+                                                {
+                                                    toRemove.Add(ans);
+                                                }
+                                                foreach (Tuple<string, string> tuple in toRemove)
+                                                {
+                                                    unresolvedQ.Answers.Remove(tuple);
+                                                }
+                                            }
+                                            else unresolvedQ.Answers.Remove(answerSelected);
+                                            double score = unresolvedQ.CorrectAnswers.Count() * (tp.LastMark - tp.CurrentExpectedMark);
+                                            if (Math.Truncate(score) == 5) unresolvedQ.Resolved = true;
+                                            break;
+                                    }
+                                }
+                                else
+                                {
+                                    unresolvedQ.Resolved = true;
+                                }
                             }
+                            Console.WriteLine($"Total/Resolved: {tp.Questions.Count()}/{tp.Questions.Where(q => q.Resolved == true).Count()}\n");
                         }
-                        Console.WriteLine($"Total/Resolved: {tp.Questions.Count()}/{tp.Questions.Where(q => q.Resolved == true).Count()}\n");
                     }
                 }
+                Driver.GetInstance.WebDrive.Close();
             }
-            Driver.GetInstance.WebDrive.Close();
+            catch(Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
         }
 
         private static void DoLogin(string loginUrl)
         {
-            Driver.GetInstance.WebDrive.Navigate().GoToUrl(loginUrl);
-            Methods.EnterText("pseudonym_session[unique_id]", "lperez23", "Name");
-            Methods.EnterText("pseudonym_session[password]", "pinZaenchuFe46.", "Name");
-            Methods.Click("Button--login", "ClassName");
+            try
+            {
+                Driver.GetInstance.WebDrive.Navigate().GoToUrl(loginUrl);
+                Methods.EnterText("pseudonym_session[unique_id]", "lperez23", "Name");
+                Methods.EnterText("pseudonym_session[password]", "pinZaenchuFe46.", "Name");
+                Methods.Click("Button--login", "ClassName");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
         }
 
         private static List<string> GetCourses()
@@ -358,9 +372,9 @@ namespace AutoTPs
                 //scarp results page
                 HtmlDocument doc = new HtmlDocument();
                 doc.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
-
+                var mark = doc.DocumentNode.CssSelect(".score_value").FirstOrDefault().InnerHtml;
                 //return mark
-                return Convert.ToDouble(doc.DocumentNode.CssSelect(".score_value").FirstOrDefault().InnerHtml);
+                return Convert.ToDouble(mark);
             }
             catch
             {
@@ -376,8 +390,10 @@ namespace AutoTPs
                 Driver.GetInstance.WebDrive.SwitchTo().Alert();
                 return true;
             }
-            catch (NoAlertPresentException Ex)
+            catch (NoAlertPresentException e)
             {
+
+                Console.WriteLine(e.Message);
                 return false;
             }
         }
