@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using HtmlAgilityPack;
 using OpenQA.Selenium;
 using ScrapySharp.Extensions;
+using System.Globalization;
 
 namespace AutoTPs
 {
@@ -22,24 +23,26 @@ namespace AutoTPs
 
                 foreach (string c in Courses)
                 {
-                    if (c == "/courses/7662") continue;
-                    if (c == "/courses/9674") continue;
-                    Driver.GetInstance.WebDrive.Navigate().GoToUrl($"{baseUrl}{c}");
-                    List<string> tpLinks = GetTPLinks();
+                    if (c == "/courses/12092") continue;
+                    if (c == "/courses/11743") continue;
+                    if (c == "/courses/12282") continue;
+                    if (c == "/courses/12213") continue;
+                    Driver.GetInstance.WebDrive.Navigate().GoToUrl($"{baseUrl}{c}/grades");
+                    List<string> tpLinks = GetTPLinksInGrades();
                     foreach (string t in tpLinks)
                     {
                         Driver.GetInstance.WebDrive.Navigate().GoToUrl($"{baseUrl}{t}");
-                        Console.WriteLine("Skip this TP? y/n");
-                        char keyEnter = Console.ReadKey().KeyChar;
-                        if (keyEnter == 'y') continue;
+                        // Console.WriteLine("Skip this TP? y/n");
+                        // char keyEnter = Console.ReadKey().KeyChar;
+                        // if (keyEnter == 'y') continue;
                         TP tp = new TP();
-                        while (tp.LastMark < 100)
+                        while (resolvedCount(tp) < 30)
                         {
                             //clear current questions list and initialize expected mark
                             tp.CurrentQuestions.Clear();
                             tp.CurrentExpectedMark = 0;
 
-                            Task.Delay(500);
+                            Task.Delay(1500);
 
                             //take it
                             Methods.Click("take_quiz_link", "Id");
@@ -74,10 +77,13 @@ namespace AutoTPs
                                             else Methods.Click(ans.Item1, "Id");
                                         }
                                     }
-                                    if (!q.Printed) TakeScreenshot(q);
+                                    // if (!q.Printed) TakeScreenshot(q);
                                     tp.CurrentExpectedMark += 5;
                                 }
+
                             }
+
+                            // Task.Delay(5000);
 
                             //print the expected minimum mark
                             Console.WriteLine($"Minimum expected mark: {tp.CurrentExpectedMark}");
@@ -85,11 +91,11 @@ namespace AutoTPs
                             //select an unresolved question
                             Question unresolvedQ = tp.CurrentQuestions.Where(q => q.Resolved == false).FirstOrDefault();
 
-                            if (tp.CurrentExpectedMark > 90)
-                            {
-                                Console.WriteLine($"You can print to pdf this expected mark");
-                                Console.ReadKey();
-                            }
+                            // if (resolvedCount(tp) > 28)
+                            // {
+                            //     Console.WriteLine($"You can print to pdf this expected mark");
+                            //     Console.ReadKey();
+                            // }
 
                             //select an answer
                             Tuple<string, string> answerSelected = new Tuple<string, string>("", "");
@@ -100,7 +106,9 @@ namespace AutoTPs
                                     if (unresolvedQ.Type == "multiple_answers_question"
                                         || unresolvedQ.Type == "multiple_choice_question")
                                     {
-                                        foreach (Tuple<string, string> a in unresolvedQ.CorrectAnswers) Methods.Click(a.Item1, "Id");
+                                        foreach (Tuple<string, string> a in unresolvedQ.CorrectAnswers) {
+                                            Methods.Click(a.Item1, "Id");
+                                        }
                                     }
                                     else
                                     {
@@ -113,7 +121,9 @@ namespace AutoTPs
                                 else
                                 {
                                     answerSelected = unresolvedQ.Answers.FirstOrDefault();
-                                    if (unresolvedQ.Type == "multiple_choice_question") Methods.Click(answerSelected.Item1, "Id");
+                                    if (unresolvedQ.Type == "multiple_choice_question") {
+                                        Methods.Click(answerSelected.Item1, "Id");
+                                    }
                                     else
                                     {
                                         if (unresolvedQ.Type == "matching_question")
@@ -125,7 +135,7 @@ namespace AutoTPs
                                 }
                             }
 
-                            Task.Delay(1500);
+                            Task.Delay(2000);
 
                             //submit
                             Methods.Click("submit_quiz_button", "Id");
@@ -177,7 +187,8 @@ namespace AutoTPs
                                             }
                                             else unresolvedQ.Answers.Remove(answerSelected);
                                             double score = unresolvedQ.CorrectAnswers.Count() * (tp.LastMark - tp.CurrentExpectedMark);
-                                            if (Math.Truncate(score) == 5) unresolvedQ.Resolved = true;
+                                            double rounded = Math.Round(score);
+                                            if ( rounded == 5) unresolvedQ.Resolved = true;
                                             break;
                                     }
                                 }
@@ -204,7 +215,7 @@ namespace AutoTPs
             {
                 Driver.GetInstance.WebDrive.Navigate().GoToUrl(loginUrl);
                 Methods.EnterText("pseudonym_session[unique_id]", "lperez23", "Name");
-                Methods.EnterText("pseudonym_session[password]", "pinZaenchuFe46.", "Name");
+                Methods.EnterText("pseudonym_session[password]", "mousEPad51.", "Name");
                 Methods.Click("Button--login", "ClassName");
             }
             catch (Exception e)
@@ -241,6 +252,31 @@ namespace AutoTPs
                 }
             }
             return TPLinks;
+        }
+
+        private static List<string> GetTPLinksInGrades()
+        {
+            HtmlDocument doc = new HtmlDocument();
+            doc.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
+            List<string> TPLinks = new List<string>();
+            var selectNodes = doc.DocumentNode.Descendants("a");
+            foreach (var Nodo in selectNodes)
+            {
+                if(Nodo.InnerText.Contains("Trabajo")) {
+                    HtmlAttributeCollection atts = Nodo.Attributes;
+                    String tp = atts.Where(a => a.Name.ToLower() == "href").FirstOrDefault().Value;                    
+                    TPLinks.Add(tp.Substring(0, tp.IndexOf("submissions") -1));
+                }
+            }
+            return TPLinks;
+        }
+
+        private static int resolvedCount(TP tp) {
+            int total = 0;
+            foreach(Question q in tp.Questions) {
+                if(q.Resolved) total = total + 1;
+            }
+            return total;
         }
 
         private static void LoadQuestions(TP tp)
@@ -374,7 +410,10 @@ namespace AutoTPs
                 doc.LoadHtml(Driver.GetInstance.WebDrive.PageSource);
                 var mark = doc.DocumentNode.CssSelect(".score_value").FirstOrDefault().InnerHtml;
                 //return mark
-                return Convert.ToDouble(mark);
+                NumberFormatInfo provider = new NumberFormatInfo();
+                provider.NumberDecimalSeparator = ".";
+                var doubleMark = Convert.ToDouble(mark, provider);
+                return doubleMark;
             }
             catch
             {
